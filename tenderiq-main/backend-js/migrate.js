@@ -251,7 +251,9 @@ const indexes = [
   'ALTER TABLE scrape_runs ADD COLUMN heartbeat_at DATETIME NULL',
   // Sortable copy of the title: TEXT columns can't use an index for ORDER BY,
   // so keep the first 191 chars in an indexed, auto-maintained column.
-  "ALTER TABLE tenders ADD COLUMN title_sort VARCHAR(191) GENERATED ALWAYS AS (LEFT(title, 191)) STORED, ADD INDEX idx_tenders_title_sort (title_sort)",
+  // Two separate statements: TiDB can't index a column in the same ALTER that adds it
+  "ALTER TABLE tenders ADD COLUMN title_sort VARCHAR(191) GENERATED ALWAYS AS (LEFT(title, 191)) STORED",
+  'CREATE INDEX idx_tenders_title_sort ON tenders (title_sort)',
   // Tenders list: default sort is newest first; also sortable by value
   'CREATE INDEX idx_tenders_created_at ON tenders (created_at)',
   'CREATE INDEX idx_tenders_cost ON tenders (estimated_project_cost)',

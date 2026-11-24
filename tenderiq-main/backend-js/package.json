@@ -9,7 +9,8 @@
     "seed": "node prisma/seed.js",
     "import:gem": "node scripts/import-gem.js",
     "copy-data": "node scripts/copy-data.js",
-    "make-admin": "node scripts/make-admin.js"
+    "make-admin": "node scripts/make-admin.js",
+    "db-check": "node scripts/db-check.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",
