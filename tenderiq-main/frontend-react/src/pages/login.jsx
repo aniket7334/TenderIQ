@@ -25,7 +25,13 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required').min(6, 'Password must be at least 6 characters'),
 });
 
-const demoAccounts = [
+// Demo quick-login buttons (with their passwords) are only for local
+// development. In a production build they are compiled out entirely, so the
+// public site never exposes demo credentials. Set VITE_SHOW_DEMO_ACCOUNTS=true
+// to show them on purpose (e.g. a private demo deployment).
+const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === 'true';
+
+const demoAccounts = !SHOW_DEMO_ACCOUNTS ? [] : [
   {
     role: 'Admin',
     email: 'admin@tenderiq.com',
@@ -185,7 +191,8 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      {/* Demo accounts */}
+      {/* Demo accounts (development only — see SHOW_DEMO_ACCOUNTS) */}
+      {demoAccounts.length > 0 && (
       <div className="mt-8">
         <div className="flex items-center gap-3">
           <span className="h-px flex-1 bg-gray-200" />
@@ -225,6 +232,7 @@ export default function LoginPage() {
           })}
         </div>
       </div>
+      )}
     </AuthLayout>
   );
 }

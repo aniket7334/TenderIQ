@@ -270,8 +270,17 @@ async function migrate() {
       const match = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/);
       const tableName = match ? match[1] : `statement ${i + 1}`;
       process.stdout.write(`  Creating table ${tableName}...`);
-      await conn.execute(sql);
-      console.log(' OK');
+      try {
+        await conn.execute(sql);
+        console.log(' OK');
+      } catch (err) {
+        // MySQL-compatible clouds (e.g. TiDB) may not support FULLTEXT indexes —
+        // create the table without it (search uses LIKE and works either way).
+        if (/FULLTEXT/i.test(sql) && /fulltext|not supported|unsupported/i.test(err.message)) {
+          await conn.execute(sql.replace(/,\s*FULLTEXT INDEX[^,]*\([^)]*\)/i, ''));
+          console.log(' OK (without FULLTEXT index — not supported by this database)');
+        } else throw err;
+      }
     }
     for (const sql of indexes) {
       const name = (sql.match(/INDEX (\w+)/) || sql.match(/COLUMN (\w+)/))[1];
@@ -281,6 +290,12 @@ async function migrate() {
         console.log(' OK');
       } catch (err) {
         if (err.code === 'ER_DUP_KEYNAME' || err.code === 'ER_DUP_FIELDNAME') console.log(' already exists');
+        // TiDB can't add a STORED generated column to an existing table; a
+        // VIRTUAL one with an index sorts just as fast.
+        else if (/GENERATED ALWAYS[\s\S]*STORED/i.test(sql) && /stored|generated|not supported|unsupported/i.test(err.message)) {
+          await conn.execute(sql.replace(/\bSTORED\b/i, 'VIRTUAL'));
+          console.log(' OK (as VIRTUAL generated column)');
+        }
         else throw err;
       }
     }

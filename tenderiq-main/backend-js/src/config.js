@@ -6,6 +6,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.config = void 0;
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
+function parseOrigins(raw) {
+    if (!raw) return ['http://localhost:3000', 'http://localhost:5173'];
+    const text = raw.trim();
+    let list;
+    try {
+        list = text.startsWith('[') ? JSON.parse(text) : text.split(',');
+    }
+    catch {
+        list = text.replace(/[\[\]"']/g, '').split(',');
+    }
+    // "https://site.app/" and "https://site.app" must both match the browser's Origin
+    return list.map((o) => String(o).trim().replace(/\/+$/, '')).filter(Boolean);
+}
 exports.config = {
     database: {
         // Set DATABASE_URL in .env — never hard-code real credentials here.
@@ -39,7 +52,9 @@ exports.config = {
     app: {
         name: process.env.APP_NAME || 'TenderIQ',
         url: process.env.APP_URL || 'http://localhost:3000',
-        corsOrigins: JSON.parse(process.env.CORS_ORIGINS || '["http://localhost:3000","https://tenderiq.meka.com"]'),
+        // CORS_ORIGINS: a JSON array or a comma-separated list of allowed site
+        // addresses, e.g. https://tenderiq.vercel.app,http://localhost:5173
+        corsOrigins: parseOrigins(process.env.CORS_ORIGINS),
         port: parseInt(process.env.PORT || '8000'),
         debug: process.env.DEBUG === 'true',
     },
