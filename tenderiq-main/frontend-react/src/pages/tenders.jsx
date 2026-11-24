@@ -1,0 +1,1149 @@
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+  Eye,
+  Loader2,
+  FileText,
+  X,
+  AlertTriangle,
+  RefreshCw,
+  Download,
+  SlidersHorizontal,
+  Columns3,
+  Plus,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import api from '@/lib/api';
+import { ALL_COUNTRIES, INTERNATIONAL_REGIONS } from '@/lib/countries';
+import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'new', label: 'New' },
+  { value: 'interested', label: 'Shortlisted' },
+  { value: 'scraped', label: 'Reviewed' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'awarded', label: 'Awarded' },
+  { value: 'closed', label: 'Closed' },
+];
+
+const COUNTRY_OPTIONS = [
+  { value: '', label: 'All Countries', flag: '🌐' },
+  { value: 'India', label: 'India', flag: '🇮🇳' },
+  { value: 'USA', label: 'USA', flag: '🇺🇸' },
+  { value: 'European Union', label: 'EU', flag: '🇪🇺' },
+  { value: 'United Kingdom', label: 'UK', flag: '🇬🇧' },
+  { value: 'UAE', label: 'UAE', flag: '🇦🇪' },
+  { value: 'Saudi Arabia', label: 'Saudi Arabia', flag: '🇸🇦' },
+  { value: 'Qatar', label: 'Qatar', flag: '🇶🇦' },
+  { value: 'Australia', label: 'Australia', flag: '🇦🇺' },
+  { value: 'Canada', label: 'Canada', flag: '🇨🇦' },
+  { value: 'World Bank', label: 'World Bank', flag: '🏦' },
+  { value: 'United Nations', label: 'UN', flag: '🇺🇳' },
+];
+
+const COUNTRY_MORE = [
+  // Middle East
+  { value: 'Oman', label: 'Oman' },
+  { value: 'Kuwait', label: 'Kuwait' },
+  { value: 'Bahrain', label: 'Bahrain' },
+  { value: 'Jordan', label: 'Jordan' },
+  { value: 'Egypt', label: 'Egypt' },
+  // Africa
+  { value: 'Kenya', label: 'Kenya' },
+  { value: 'Nigeria', label: 'Nigeria' },
+  { value: 'South Africa', label: 'South Africa' },
+  { value: 'Tanzania', label: 'Tanzania' },
+  { value: 'Ghana', label: 'Ghana' },
+  { value: 'Ethiopia', label: 'Ethiopia' },
+  { value: 'Morocco', label: 'Morocco' },
+  { value: 'Algeria', label: 'Algeria' },
+  { value: 'Tunisia', label: 'Tunisia' },
+  { value: 'Senegal', label: 'Senegal' },
+  { value: "Côte d'Ivoire", label: "Côte d'Ivoire" },
+  { value: 'Uganda', label: 'Uganda' },
+  { value: 'Rwanda', label: 'Rwanda' },
+  { value: 'Cameroon', label: 'Cameroon' },
+  { value: 'Botswana', label: 'Botswana' },
+  { value: 'Zambia', label: 'Zambia' },
+  // SE Asia
+  { value: 'Singapore', label: 'Singapore' },
+  { value: 'Malaysia', label: 'Malaysia' },
+  { value: 'Indonesia', label: 'Indonesia' },
+  { value: 'Philippines', label: 'Philippines' },
+  { value: 'Thailand', label: 'Thailand' },
+  { value: 'Vietnam', label: 'Vietnam' },
+  // East Asia & Pacific
+  { value: 'Japan', label: 'Japan' },
+  { value: 'South Korea', label: 'South Korea' },
+  { value: 'New Zealand', label: 'New Zealand' },
+  // Europe (non-EU)
+  { value: 'Norway', label: 'Norway' },
+  { value: 'Switzerland', label: 'Switzerland' },
+  { value: 'Turkey', label: 'Turkey' },
+  // Americas
+  { value: 'Brazil', label: 'Brazil' },
+  { value: 'Mexico', label: 'Mexico' },
+  { value: 'Chile', label: 'Chile' },
+  { value: 'Colombia', label: 'Colombia' },
+  { value: 'Peru', label: 'Peru' },
+  { value: 'Argentina', label: 'Argentina' },
+  { value: 'Ecuador', label: 'Ecuador' },
+  { value: 'Panama', label: 'Panama' },
+  // South Asia
+  { value: 'Bangladesh', label: 'Bangladesh' },
+  { value: 'Sri Lanka', label: 'Sri Lanka' },
+  { value: 'Nepal', label: 'Nepal' },
+  { value: 'Maldives', label: 'Maldives' },
+  // Central Asia
+  { value: 'Kazakhstan', label: 'Kazakhstan' },
+  { value: 'Uzbekistan', label: 'Uzbekistan' },
+  { value: 'Georgia', label: 'Georgia' },
+  { value: 'Azerbaijan', label: 'Azerbaijan' },
+  { value: 'Kyrgyzstan', label: 'Kyrgyzstan' },
+  { value: 'Armenia', label: 'Armenia' },
+  // Multilateral / dev banks
+  { value: 'Asian Development Bank', label: 'Asian Development Bank' },
+  { value: 'African Development Bank', label: 'African Development Bank' },
+  { value: 'Inter-American Development Bank', label: 'Inter-American Dev Bank' },
+  { value: 'EBRD', label: 'EBRD' },
+  { value: 'AIIB', label: 'AIIB' },
+  { value: 'Islamic Development Bank', label: 'Islamic Development Bank' },
+  { value: 'New Development Bank', label: 'New Development Bank' },
+  { value: 'European Investment Bank', label: 'European Investment Bank' },
+  { value: 'KfW', label: 'KfW (Germany)' },
+  { value: 'JICA', label: 'JICA (Japan)' },
+  { value: 'FCDO', label: 'FCDO (UK)' },
+  { value: 'USAID', label: 'USAID' },
+  // Misc
+  { value: 'Netherlands', label: 'Netherlands' },
+  { value: 'Global', label: 'Global (Oil & Gas)' },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'All Categories', color: 'bg-gray-100 text-gray-600' },
+  { value: 'Port', label: 'Port', color: 'bg-blue-100 text-blue-700' },
+  { value: 'Jetty', label: 'Jetty', color: 'bg-cyan-100 text-cyan-700' },
+  { value: 'Wharf', label: 'Wharf', color: 'bg-teal-100 text-teal-700' },
+  { value: 'Breakwater', label: 'Breakwater', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'Harbour', label: 'Harbour', color: 'bg-sky-100 text-sky-700' },
+  { value: 'Dredging', label: 'Dredging', color: 'bg-amber-100 text-amber-700' },
+  { value: 'Maritime', label: 'Maritime', color: 'bg-blue-100 text-blue-700' },
+  { value: 'Dock', label: 'Dock', color: 'bg-slate-100 text-slate-700' },
+  { value: 'Berth', label: 'Berth', color: 'bg-violet-100 text-violet-700' },
+  { value: 'Shipping', label: 'Shipping', color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'Cargo', label: 'Cargo', color: 'bg-orange-100 text-orange-700' },
+  { value: 'Vessel', label: 'Vessel', color: 'bg-purple-100 text-purple-700' },
+  { value: 'Tugboat', label: 'Tugboat', color: 'bg-rose-100 text-rose-700' },
+  { value: 'Navigation', label: 'Navigation', color: 'bg-lime-100 text-lime-700' },
+  { value: 'Coastal', label: 'Coastal', color: 'bg-cyan-100 text-cyan-700' },
+  { value: 'Waterway', label: 'Waterway', color: 'bg-blue-100 text-blue-700' },
+  { value: 'Shipbuilding', label: 'Shipbuilding', color: 'bg-fuchsia-100 text-fuchsia-700' },
+  { value: 'Ship Repair', label: 'Ship Repair', color: 'bg-pink-100 text-pink-700' },
+  { value: 'Railway', label: 'Railway', color: 'bg-red-100 text-red-700' },
+  { value: 'Construction', label: 'Construction', color: 'bg-orange-100 text-orange-700' },
+  { value: 'Road', label: 'Road', color: 'bg-gray-100 text-gray-700' },
+  { value: 'Maintenance', label: 'Maintenance', color: 'bg-green-100 text-green-700' },
+  { value: 'Consultancy', label: 'Consultancy', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'Procurement', label: 'Procurement', color: 'bg-emerald-100 text-emerald-700' },
+];
+
+function TendersPageContent() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [tenders, setTenders] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sources, setSources] = useState([]);
+  const [regionFacets, setRegionFacets] = useState([]);
+  const [sectorFacets, setSectorFacets] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedCountry, setSelectedCountry] = useState(searchParams.get('country') || '');
+  const [density, setDensity] = useState('compact');
+  const [filters, setFilters] = useState({
+    search: searchParams.get('search') || '',
+    status: searchParams.get('status') || '',
+    source_id: searchParams.get('source_id') ? Number(searchParams.get('source_id')) : undefined,
+    state: searchParams.get('state') || '',
+    date_from: searchParams.get('date_from') || '',
+    date_to: searchParams.get('date_to') || '',
+    page: Number(searchParams.get('page')) || 1,
+    page_size: 20,
+    sort_by: searchParams.get('sort_by') || 'created_at',
+    sort_order: searchParams.get('sort_order') || 'desc',
+  });
+
+  const fetchTenders = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = {};
+      if (filters.search) params.search = filters.search;
+      if (filters.status) params.internal_status = filters.status;
+      if (filters.source_id) params.source_id = filters.source_id;
+      if (filters.state) params.state = filters.state;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to) params.date_to = filters.date_to;
+      if (filters.min_value) params.min_value = filters.min_value;
+      if (filters.max_value) params.max_value = filters.max_value;
+      if (selectedCategory) params.category = selectedCategory;
+      if (selectedCountry) params.country = selectedCountry;
+      params.page = filters.page || 1;
+      params.page_size = filters.page_size || 20;
+      if (filters.sort_by) params.sort_by = filters.sort_by;
+      if (filters.sort_order) params.sort_order = filters.sort_order;
+
+      const res = await api.get('/tenders', { params });
+      setTenders(res.data.items);
+      setTotal(res.data.total);
+      setTotalPages(res.data.total_pages);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load tenders';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, selectedCategory, selectedCountry]);
+
+  const fetchSources = useCallback(async () => {
+    try {
+      const res = await api.get('/sources');
+      setSources(res.data.items || res.data || []);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  const fetchFacets = useCallback(async () => {
+    try {
+      const res = await api.get('/tenders/facets');
+      setRegionFacets(res.data.regions || []);
+      setSectorFacets(res.data.sectors || []);
+    } catch {
+      // non-critical — dropdowns fall back to hardcoded lists
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTenders();
+  }, [fetchTenders]);
+
+  useEffect(() => {
+    fetchSources();
+    fetchFacets();
+  }, [fetchSources, fetchFacets]);
+
+  const updateFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value, page: key === 'page' ? value : 1 }));
+  };
+
+  const handleSort = (column) => {
+    setFilters((prev) => ({
+      ...prev,
+      sort_by: column,
+      sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc',
+      page: 1,
+    }));
+  };
+
+  const handleShortlist = async (tenderId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await api.patch(`/tenders/${tenderId}`, { internal_status: 'interested' });
+      setTenders((prev) =>
+        prev.map((t) => (t.id === tenderId ? { ...t, internal_status: 'interested' } : t)),
+      );
+    } catch {
+      // error handled by interceptor
+    }
+  };
+
+  const clearFilters = () => {
+    setSelectedCategory('');
+    setSelectedCountry('');
+    setFilters({
+      search: '',
+      status: '',
+      source_id: undefined,
+      state: '',
+      date_from: '',
+      date_to: '',
+      min_value: undefined,
+      max_value: undefined,
+      page: 1,
+      page_size: 20,
+      sort_by: 'created_at',
+      sort_order: 'desc',
+    });
+  };
+
+  const SortIcon = ({ column }) => {
+    if (filters.sort_by !== column) return <ChevronUp className="h-3 w-3 text-gray-300" />;
+    return filters.sort_order === 'asc' ? (
+      <ChevronUp className="h-3 w-3 text-blue-600" />
+    ) : (
+      <ChevronDown className="h-3 w-3 text-blue-600" />
+    );
+  };
+
+  const handleDownloadCSV = () => {
+    if (!tenders.length) return;
+    const headers = ['Title', 'Reference No', 'Client', 'Category', 'Source', 'Estimated Value', 'Deadline', 'Status', 'Location', 'Source URL'];
+    const rows = tenders.map((t) => [
+      `"${(t.title || '').replace(/"/g, '""')}"`,
+      `"${t.reference_number || ''}"`,
+      `"${(t.organization || '').replace(/"/g, '""')}"`,
+      `"${t.category || ''}"`,
+      `"${t.source_name || ''}"`,
+      t.estimated_value || '',
+      t.submission_deadline || '',
+      t.internal_status || t.status || '',
+      `"${[t.city, t.state, t.location].filter(Boolean).join(', ')}"`,
+      t.source_url || '',
+    ]);
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tenders_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const [extracting, setExtracting] = useState(false);
+  const [extractResult, setExtractResult] = useState(null);
+
+  const handleExtractCosts = async () => {
+    try {
+      setExtracting(true);
+      setExtractResult(null);
+      const res = await api.post('/extract-costs');
+      const d = res.data;
+      setExtractResult(`Updated ${d.updated_from_text + d.updated_from_detail} tenders (${d.updated_from_text} from text, ${d.updated_from_detail} from detail pages). ${d.still_missing} still missing.`);
+      fetchTenders();
+    } catch (err) {
+      setExtractResult(err instanceof Error ? err.message : 'Failed to extract costs');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const hasActiveFilters =
+    filters.status || filters.source_id || filters.state || filters.date_from || filters.date_to || filters.min_value || filters.max_value || selectedCategory || selectedCountry || filters.search;
+
+  const activeFilterCount = [
+    filters.status,
+    filters.source_id,
+    filters.state,
+    filters.date_from,
+    filters.date_to,
+    filters.min_value,
+    filters.max_value,
+    selectedCategory,
+    selectedCountry,
+    filters.search,
+  ].filter(Boolean).length;
+
+  const fromIdx = total ? (filters.page - 1) * filters.page_size + 1 : 0;
+  const toIdx = Math.min(filters.page * filters.page_size, total);
+
+  // Density-driven row padding
+  const rowPad = density === 'compact' ? 'py-2.5' : density === 'standard' ? 'py-4' : 'py-6';
+
+  // Compact pagination range "1 2 3 … N"
+  const pageNumbers = (() => {
+    const cur = filters.page ?? 1;
+    const last = Math.max(1, totalPages);
+    if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+    if (cur <= 3) return [1, 2, 3, '…', last];
+    if (cur >= last - 2) return [1, '…', last - 2, last - 1, last];
+    return [1, '…', cur - 1, cur, cur + 1, '…', last];
+  })();
+
+  // Status → label + colour for top-of-table badges
+  const statusBadge = (raw) => {
+    const s = (raw || 'new').toLowerCase();
+    if (['new', 'open', 'scraped', 'live'].includes(s))
+      return { label: 'OPEN', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' };
+    if (['interested', 'shortlisted', 'reviewing', 'review', 'in_review'].includes(s))
+      return { label: 'UNDER REVIEW', cls: 'bg-blue-50 text-blue-700 ring-blue-600/20' };
+    if (['pending', 'awaiting', 'submitted'].includes(s))
+      return { label: 'PENDING', cls: 'bg-amber-50 text-amber-700 ring-amber-600/20' };
+    if (['awarded', 'won'].includes(s))
+      return { label: 'AWARDED', cls: 'bg-violet-50 text-violet-700 ring-violet-600/20' };
+    if (['closed', 'lost', 'rejected'].includes(s))
+      return { label: 'CLOSED', cls: 'bg-gray-100 text-gray-600 ring-gray-500/20' };
+    return { label: getStatusLabel(s).toUpperCase(), cls: 'bg-gray-100 text-gray-600 ring-gray-500/20' };
+  };
+
+
+  return (
+    <div className="space-y-4 pb-20">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Global Tenders</h1>
+        </div>
+      </div>
+
+      {/* Top control row: Advanced Filters | density | results | Export / Columns */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Advanced Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[11px] font-semibold">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* Density toggle */}
+          <div className="hidden sm:flex items-center rounded-lg border border-gray-200 bg-white p-0.5 text-sm">
+            {['compact', 'standard', 'relaxed'].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDensity(d)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  density === d ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {d[0].toUpperCase() + d.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          <span className="hidden h-6 w-px bg-gray-200 lg:block" />
+          <p className="text-sm text-gray-500">
+            Viewing <span className="font-medium text-gray-900">{fromIdx}-{toIdx}</span> of{' '}
+            <span className="font-medium text-gray-900">{total.toLocaleString()}</span> results
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={handleDownloadCSV}
+            disabled={!tenders.length}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={handleExtractCosts}
+            loading={extracting}
+            disabled={extracting}
+            title="Extract costs from selected tenders"
+          >
+            <Columns3 className="h-4 w-4" />
+            Columns
+          </Button>
+        </div>
+      </div>
+
+      {extractResult && (
+        <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-2 text-sm text-blue-700">
+          {extractResult}
+        </div>
+      )}
+
+      {/* Region / Sector / Contract Value filter card */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-5 shadow-sm">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Region
+            </label>
+            <select
+              value={selectedCountry}
+              onChange={(e) => {
+                setSelectedCountry(e.target.value);
+                setFilters((prev) => ({ ...prev, page: 1 }));
+              }}
+              className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">
+                All Regions
+                {regionFacets.length > 0 && ` (${regionFacets.reduce((s, r) => s + r.count, 0)})`}
+              </option>
+              {/* Countries that have tenders first (with counts), then every other country */}
+              {regionFacets.length > 0 && (
+                <optgroup label="With tenders">
+                  {regionFacets.map((r) => {
+                    const opt = ALL_COUNTRIES.find((c) => c.value === r.country);
+                    return (
+                      <option key={`has-${r.country}`} value={r.country}>
+                        {opt?.flag ? `${opt.flag} ` : ''}
+                        {r.country} ({r.count})
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
+              <optgroup label="International">
+                {INTERNATIONAL_REGIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.flag} {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="All countries">
+                {ALL_COUNTRIES.filter((c) => !regionFacets.some((r) => r.country === c.value)).map((opt) => (
+                  <option key={opt.code} value={opt.value}>
+                    {opt.flag} {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Sector
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                setFilters((prev) => ({ ...prev, page: 1 }));
+              }}
+              className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">
+                All Categories
+                {sectorFacets.length > 0 &&
+                  ` (${sectorFacets.reduce((s, x) => s + x.count, 0)})`}
+              </option>
+              {sectorFacets.length > 0
+                ? sectorFacets.map((s) => (
+                    <option key={s.sector} value={s.sector}>
+                      {s.sector} ({s.count})
+                    </option>
+                  ))
+                : CATEGORY_OPTIONS.slice(1).map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Contract Value
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Min"
+                type="number"
+                value={filters.min_value || ''}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    min_value: e.target.value ? Number(e.target.value) : undefined,
+                    page: 1,
+                  }))
+                }
+              />
+              <span className="text-gray-400">-</span>
+              <Input
+                placeholder="Max"
+                type="number"
+                value={filters.max_value || ''}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    max_value: e.target.value ? Number(e.target.value) : undefined,
+                    page: 1,
+                  }))
+                }
+              />
+            </div>
+          </div>
+          <div className="flex items-end gap-2">
+            {hasActiveFilters && (
+              <Button variant="outline" size="md" onClick={clearFilters}>
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+            )}
+            <Button variant="primary" size="md" onClick={fetchTenders}>
+              Apply{activeFilterCount ? ` ${activeFilterCount} Active` : ''} Filters
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Hidden legacy category chips kept for SEO/bookmarks but not displayed */}
+      <div className="hidden">
+        {CATEGORY_OPTIONS.map((cat) => {
+          const isActive = selectedCategory === cat.value;
+          return (
+            <button
+              key={cat.value}
+              onClick={() => {
+                setSelectedCategory(cat.value);
+                setFilters(prev => ({ ...prev, page: 1 }));
+              }}
+              className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-all border ${
+                isActive
+                  ? `${cat.color} border-current ring-2 ring-offset-1 ring-current/20 shadow-sm`
+                  : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Country - hidden (replaced by Region dropdown above) */}
+      <div className="hidden flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">Country:</span>
+        {COUNTRY_OPTIONS.map((opt) => {
+          const isActive = selectedCountry === opt.value;
+          return (
+            <button
+              key={opt.value || 'all'}
+              onClick={() => {
+                setSelectedCountry(opt.value);
+                setFilters((prev) => ({ ...prev, page: 1 }));
+              }}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                isActive
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200'
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <span aria-hidden>{opt.flag}</span>
+              {opt.label}
+            </button>
+          );
+        })}
+        {/* More countries dropdown */}
+        <select
+          value={
+            COUNTRY_MORE.some((c) => c.value === selectedCountry) ? selectedCountry : ''
+          }
+          onChange={(e) => {
+            setSelectedCountry(e.target.value);
+            setFilters((prev) => ({ ...prev, page: 1 }));
+          }}
+          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all focus:outline-none focus:ring-2 ${
+            COUNTRY_MORE.some((c) => c.value === selectedCountry)
+              ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200'
+              : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900 focus:ring-indigo-200'
+          }`}
+        >
+          <option value="">More countries…</option>
+          {COUNTRY_MORE.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Estimated Value - hidden (replaced by Min/Max in filter card above) */}
+      <div className="hidden flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">Estimated Value:</span>
+        {[
+          { label: 'All Values', min: undefined, max: undefined },
+          { label: '₹5Cr - ₹10Cr', min: 50000000, max: 100000000 },
+          { label: '₹10Cr - ₹25Cr', min: 100000000, max: 250000000 },
+          { label: '₹25Cr - ₹50Cr', min: 250000000, max: 500000000 },
+          { label: '₹50Cr - ₹100Cr', min: 500000000, max: 1000000000 },
+          { label: '₹100Cr - ₹500Cr', min: 1000000000, max: 5000000000 },
+          { label: 'Above ₹500Cr', min: 5000000000, max: undefined },
+        ].map((range) => {
+          const isActive =
+            filters.min_value === range.min && filters.max_value === range.max;
+          return (
+            <button
+              key={range.label}
+              onClick={() => {
+                setFilters((prev) => ({
+                  ...prev,
+                  min_value: range.min,
+                  max_value: range.max,
+                  page: 1,
+                }));
+              }}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                isActive
+                  ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-200'
+                  : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+            >
+              {range.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Expandable filter row */}
+      {showFilters && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          {/* Other Filters */}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500">Status</label>
+              <select
+                value={filters.status || ''}
+                onChange={(e) => updateFilter('status', e.target.value)}
+                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500">Source</label>
+              <select
+                value={filters.source_id || ''}
+                onChange={(e) =>
+                  updateFilter('source_id', e.target.value ? Number(e.target.value) : undefined)
+                }
+                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">All Sources</option>
+                {sources.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500">Location</label>
+              <Input
+                placeholder="State or city..."
+                value={filters.state || ''}
+                onChange={(e) => updateFilter('state', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500">From Date</label>
+              <Input
+                type="date"
+                value={filters.date_from || ''}
+                onChange={(e) => updateFilter('date_from', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-500">To Date</label>
+              <Input
+                type="date"
+                value={filters.date_to || ''}
+                onChange={(e) => updateFilter('date_to', e.target.value)}
+              />
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <div className="mt-3 flex justify-end">
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4" />
+                Clear all filters
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Data table */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <AlertTriangle className="mb-3 h-10 w-10 text-red-500" />
+            <p className="text-sm text-gray-600">{error}</p>
+            <Button onClick={fetchTenders} variant="outline" size="sm" className="mt-3">
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        ) : tenders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <FileText className="mb-3 h-10 w-10 text-gray-300" />
+            <p className="text-sm font-medium text-gray-600">No tenders found</p>
+            <p className="mt-1 text-sm text-gray-400">
+              Try adjusting your search or filters
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop only: table (lg and up) */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full table-fixed">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/50">
+                    <th className="w-[3%] px-4 py-3">
+                      <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    </th>
+                    <th
+                      onClick={() => handleSort('title')}
+                      className="w-[25%] cursor-pointer px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Tender Title
+                        <SortIcon column="title" />
+                      </span>
+                    </th>
+                    <th
+                      onClick={() => handleSort('category')}
+                      className="w-[11%] cursor-pointer px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
+                    >
+                      Sector
+                    </th>
+                    <th className="w-[11%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                      Region
+                    </th>
+                    <th
+                      onClick={() => handleSort('internal_status')}
+                      className="w-[9%] cursor-pointer px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
+                    >
+                      Status
+                    </th>
+                    <th
+                      onClick={() => handleSort('submission_deadline')}
+                      className="w-[10%] cursor-pointer px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
+                    >
+                      Deadline
+                    </th>
+                    <th
+                      onClick={() => handleSort('estimated_value')}
+                      className="w-[12%] cursor-pointer px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
+                    >
+                      Estimated Value
+                    </th>
+                    <th className="w-[11%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                      Internal Notes
+                    </th>
+                    <th className="w-[8%] px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {tenders.map((tender) => {
+                    const badge = statusBadge(tender.internal_status || tender.status);
+                    return (
+                      <tr
+                        key={tender.id}
+                        className="group transition-colors hover:bg-gray-50/70"
+                      >
+                        <td className={`px-4 ${rowPad}`} onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        </td>
+                        <td className={`px-4 ${rowPad}`}>
+                          <Link
+                            to={`/tenders/${tender.id}`}
+                            className="block min-w-0"
+                          >
+                            <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-blue-600">
+                              {tender.title}
+                            </p>
+                            {tender.reference_number && (
+                              <p className="mt-0.5 truncate font-mono text-[11px] text-gray-400">
+                                {tender.reference_number}
+                              </p>
+                            )}
+                          </Link>
+                        </td>
+                        <td className={`px-4 ${rowPad}`}>
+                          {(() => {
+                            const cats = (tender.categories || [tender.category]).filter(Boolean);
+                            const primary = cats[0];
+                            if (!primary) return <span className="text-gray-300">-</span>;
+                            const opt = CATEGORY_OPTIONS.find((c) => c.value === primary);
+                            const cls = opt?.color || 'bg-gray-100 text-gray-600';
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
+                                  {primary}
+                                </span>
+                                {cats.length > 1 && (
+                                  <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                                    +{cats.length - 1}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className={`px-4 ${rowPad}`}>
+                          {(() => {
+                            const country = tender.country;
+                            if (!country) return <span className="text-gray-300">-</span>;
+                            const opt = COUNTRY_OPTIONS.find((c) => c.value === country);
+                            return (
+                              <span className="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                                <span aria-hidden>{opt?.flag || '📍'}</span>
+                                <span className="truncate">{country}</span>
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className={`px-4 ${rowPad}`}>
+                          <span
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${badge.cls}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td className={`px-4 ${rowPad} text-sm text-gray-700`}>
+                          {formatDate(tender.submission_deadline)}
+                        </td>
+                        <td className={`px-4 ${rowPad} text-right font-mono text-sm text-gray-900`}>
+                          {tender.estimated_value
+                            ? formatCurrency(tender.estimated_value, tender.currency || tender.estimated_cost_currency || 'INR')
+                            : <span className="text-gray-300">-</span>}
+                        </td>
+                        <td className={`px-4 ${rowPad}`}>
+                          <Link
+                            to={`/tenders/${tender.id}#notes`}
+                            className="block truncate text-sm italic text-gray-400 hover:text-gray-600 hover:not-italic"
+                          >
+                            Click to add note...
+                          </Link>
+                        </td>
+                        <td className={`px-4 ${rowPad}`}>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => handleShortlist(tender.id, e)}
+                              title="Shortlist tender"
+                              className={`rounded-lg p-1.5 transition-colors ${
+                                tender.internal_status === 'interested'
+                                  ? 'text-amber-500 hover:bg-amber-50'
+                                  : 'text-gray-400 hover:bg-amber-50 hover:text-amber-500'
+                              }`}
+                            >
+                              <Star
+                                className="h-4 w-4"
+                                fill={tender.internal_status === 'interested' ? 'currentColor' : 'none'}
+                              />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (tender.source_url) window.open(tender.source_url, '_blank');
+                              }}
+                              disabled={!tender.source_url}
+                              title="Download / open source"
+                              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile + tablet: stacked cards (below lg) */}
+            <ul className="lg:hidden divide-y divide-gray-100">
+              {tenders.map((tender) => {
+                const cats = (tender.categories || [tender.category]).filter(Boolean).slice(0, 2);
+                return (
+                  <li
+                    key={tender.id}
+                    className="px-4 py-3 active:bg-blue-50/40 transition-colors"
+                    onClick={() => navigate(`/tenders/${tender.id}`)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">
+                        {tender.title}
+                      </p>
+                      <span
+                        className={`flex-shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getStatusColor(tender.internal_status || tender.status)}`}
+                      >
+                        {getStatusLabel(tender.internal_status || tender.status)}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate font-mono text-xs text-gray-400">
+                      {tender.reference_number}
+                    </p>
+                    {tender.organization && (
+                      <p className="mt-1 truncate text-xs text-gray-600">{tender.organization}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                      {tender.estimated_value && (
+                        <span className="font-medium text-gray-700">{formatCurrency(tender.estimated_value, tender.currency || tender.estimated_cost_currency || 'INR')}</span>
+                      )}
+                      <span>Due {formatDate(tender.submission_deadline)}</span>
+                      {tender.source_name && (
+                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                          {tender.source_name}
+                        </span>
+                      )}
+                    </div>
+                    {cats.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {cats.map((cat, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-2 flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/tenders/${tender.id}`);
+                        }}
+                        title="View tender"
+                        className="rounded-lg p-2 text-gray-500 hover:bg-blue-100 hover:text-blue-600"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => handleShortlist(tender.id, e)}
+                        title="Shortlist tender"
+                        className={`rounded-lg p-2 ${
+                          tender.internal_status === 'interested'
+                            ? 'text-amber-500 hover:bg-amber-50'
+                            : 'text-gray-500 hover:bg-amber-50 hover:text-amber-500'
+                        }`}
+                      >
+                        <Star
+                          className="h-4 w-4"
+                          fill={tender.internal_status === 'interested' ? 'currentColor' : 'none'}
+                        />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Load-more affordance + pagination */}
+            {filters.page < totalPages && (
+              <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3 sm:px-6">
+                <div className="hidden h-10 w-16 flex-shrink-0 overflow-hidden rounded-md border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-2 sm:block">
+                  <div className="h-1 w-full rounded bg-gray-200" />
+                  <div className="mt-1 h-1 w-2/3 rounded bg-gray-200" />
+                  <div className="mt-1 h-1 w-1/2 rounded bg-blue-500" />
+                </div>
+                <button
+                  onClick={() => updateFilter('page', (filters.page || 1) + 1)}
+                  className="text-left"
+                >
+                  <p className="text-sm font-medium text-gray-700 hover:text-blue-600">
+                    Load more results...
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {Math.max(0, total - filters.page * filters.page_size).toLocaleString()} items remaining in current filter set
+                  </p>
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>Rows per page:</span>
+                <select
+                  value={filters.page_size}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, page_size: Number(e.target.value), page: 1 }))
+                  }
+                  className="rounded-md border border-gray-200 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  {[20, 50, 100].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={filters.page === 1}
+                  onClick={() => updateFilter('page', (filters.page || 1) - 1)}
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                {pageNumbers.map((p, i) =>
+                  p === '…' ? (
+                    <span key={`gap-${i}`} className="px-2 text-sm text-gray-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => updateFilter('page', p)}
+                      className={`min-w-[32px] rounded-md px-2 py-1 text-sm font-medium ${
+                        filters.page === p
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+                <button
+                  disabled={filters.page === totalPages}
+                  onClick={() => updateFilter('page', (filters.page || 1) + 1)}
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-500">
+                Page {filters.page} of {Math.max(1, totalPages)}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Floating action button */}
+      <button
+        type="button"
+        onClick={() => navigate('/tenders/new')}
+        title="Create tender"
+        className="fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+      >
+        <Plus className="h-5 w-5" />
+      </button>
+    </div>
+  );
+}
+
+export default function TendersPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
+      <TendersPageContent />
+    </Suspense>
+  );
+}

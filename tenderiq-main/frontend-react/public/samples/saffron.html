@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TenderIQ · Saffron Terminal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root { --bg:#0c0d0b; --panel:#121410; --line:#23261f; --sf:#ff9933; --gr:#19c37d; --tx:#d8dbd2; }
+  body { font-family: Barlow, sans-serif; background: var(--bg); color: var(--tx);
+         background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+         background-size: 48px 48px; background-position: -1px -1px; }
+  .cond { font-family: 'Barlow Condensed', sans-serif; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .panel { background: var(--panel); border: 1px solid var(--line); position: relative; }
+  .panel::before, .panel::after { content:''; position:absolute; width:10px; height:10px; border-color: var(--sf); }
+  .panel::before { top:-1px; left:-1px; border-top:2px solid; border-left:2px solid; }
+  .panel::after { bottom:-1px; right:-1px; border-bottom:2px solid; border-right:2px solid; }
+  .ticker { animation: tick 40s linear infinite; }
+  @keyframes tick { to { transform: translateX(-50%); } }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.25; } }
+  .scan { animation: scan .6s ease both; }
+  @keyframes scan { from { transform: translateY(6px); } }
+  tr:hover td { background: rgba(255,153,51,.06); }
+  [data-lucide] { width:15px; height:15px; stroke-width:1.75; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Status bar -->
+<div class="mono flex items-center gap-6 border-b border-[var(--line)] bg-black px-5 py-1.5 text-[11px] uppercase tracking-wider text-[#8b8f84]">
+  <span class="flex items-center gap-2 text-[var(--gr)]"><span class="pulse h-1.5 w-1.5 rounded-full bg-[var(--gr)]"></span>Feeds live</span>
+  <span>GeM <b class="text-[var(--tx)]">OK</b></span><span>eTenders <b class="text-[var(--tx)]">OK</b></span><span>CPPP <b class="text-[var(--sf)]">Degraded</b></span>
+  <span class="ml-auto">Last sync 11:42:07 IST</span><span>User AD · Bid desk</span>
+</div>
+
+<!-- Ticker -->
+<div class="overflow-hidden border-b border-[var(--line)] bg-[#0f100d] py-2">
+  <div class="ticker mono flex w-max gap-10 whitespace-nowrap text-[12px]" id="ticker"></div>
+</div>
+
+<div class="flex">
+  <!-- Rail -->
+  <aside class="w-[68px] shrink-0 border-r border-[var(--line)] bg-black/40 py-5">
+    <div class="cond mx-auto flex h-10 w-10 items-center justify-center bg-[var(--sf)] text-xl font-bold text-black">TQ</div>
+    <div class="mt-8 flex flex-col items-center gap-5 text-[#6d7166]">
+      <i data-lucide="gauge"></i><span class="text-[var(--sf)]"><i data-lucide="crosshair"></i></span><i data-lucide="bookmark"></i><i data-lucide="file-text"></i><i data-lucide="siren"></i><i data-lucide="settings-2"></i>
+    </div>
+  </aside>
+
+  <main class="min-w-0 flex-1 p-5">
+    <div class="flex items-end gap-4">
+      <div>
+        <p class="mono text-[11px] uppercase tracking-[.3em] text-[var(--sf)]">// Bid desk · India</p>
+        <h1 class="cond text-[56px] font-bold uppercase leading-none tracking-tight text-white">Tender command</h1>
+      </div>
+      <div class="mono ml-auto flex items-center gap-2 border border-[var(--line)] bg-black/50 px-3 py-2 text-[12px] text-[#8b8f84]"><span class="text-[var(--sf)]">&gt;</span> filter category:electrical closes:&lt;7d<span class="pulse ml-1 inline-block h-4 w-2 bg-[var(--sf)]"></span></div>
+      <button class="cond flex items-center gap-2 bg-[var(--sf)] px-5 py-2.5 text-lg font-semibold uppercase tracking-wide text-black"><i data-lucide="refresh-cw"></i>Run scrape</button>
+    </div>
+
+    <!-- KPIs -->
+    <section class="mt-5 grid grid-cols-5 gap-3">
+      <div class="panel scan p-4"><p class="mono text-[10px] uppercase tracking-widest text-[#8b8f84]">Live tenders</p><p class="cond mt-1 text-[44px] font-bold leading-none text-white">8,412</p><p class="mono text-[11px] text-[var(--gr)]">▲ 312 / 24h</p></div>
+      <div class="panel scan p-4" style="animation-delay:.08s"><p class="mono text-[10px] uppercase tracking-widest text-[#8b8f84]">Close &lt; 48h</p><p class="cond mt-1 text-[44px] font-bold leading-none text-[var(--sf)]">1,206</p><p class="mono text-[11px] text-[#8b8f84]">142 keyword hits</p></div>
+      <div class="panel scan p-4" style="animation-delay:.16s"><p class="mono text-[10px] uppercase tracking-widest text-[#8b8f84]">Shortlisted</p><p class="cond mt-1 text-[44px] font-bold leading-none text-white">57</p><p class="mono text-[11px] text-[#8b8f84]">9 due this week</p></div>
+      <div class="panel scan col-span-2 p-4" style="animation-delay:.24s">
+        <div class="flex justify-between"><p class="mono text-[10px] uppercase tracking-widest text-[#8b8f84]">New tenders · last 24h</p><p class="mono text-[10px] text-[var(--sf)]">peak 11:00</p></div>
+        <div class="mt-3 flex h-[58px] items-end gap-[3px]" id="hist"></div>
+      </div>
+    </section>
+
+    <!-- Table + side -->
+    <section class="mt-3 grid grid-cols-[1fr_300px] gap-3">
+      <div class="panel scan overflow-hidden" style="animation-delay:.3s">
+        <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
+          <p class="cond text-xl font-semibold uppercase tracking-wide text-white">Radar</p>
+          <div class="mono ml-4 flex gap-1 text-[11px]" id="tabs"></div>
+          <span class="mono ml-auto text-[11px] text-[#6d7166]">6 of 8,412 · sort: deadline ↑</span>
+        </div>
+        <table class="mono w-full text-[12.5px]">
+          <thead class="text-left text-[10px] uppercase tracking-widest text-[#6d7166]"><tr class="border-b border-[var(--line)]"><th class="px-4 py-2">Bid id</th><th class="px-4 py-2">Item / work</th><th class="px-4 py-2">Sector</th><th class="px-4 py-2">Buyer</th><th class="px-4 py-2 text-right">T-minus</th><th class="px-4 py-2"></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="space-y-3">
+        <div class="panel scan p-4" style="animation-delay:.38s">
+          <p class="mono text-[10px] uppercase tracking-widest text-[#8b8f84]">Sector load</p>
+          <div class="mt-3 space-y-2.5" id="load"></div>
+        </div>
+        <div class="panel scan p-4" style="animation-delay:.46s">
+          <p class="mono text-[10px] uppercase tracking-widest text-[var(--sf)]">Alert · 11:38</p>
+          <p class="cond mt-1 text-[22px] font-semibold leading-tight text-white">Solar PV bid matches 3 of your keywords</p>
+          <p class="mt-1 text-[13px] text-[#8b8f84]">Ministry of Defence · closes in 2 days</p>
+          <button class="cond mt-3 w-full border border-[var(--sf)] py-2 text-[15px] font-semibold uppercase tracking-wide text-[var(--sf)] hover:bg-[var(--sf)] hover:text-black">Open bid</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const T=[
+ ['GEM/26/B/7579011','LED luminaire, road & street lighting','Road','Min. of Power',1],
+ ['GEM/26/B/7590396','Off-grid solar PV power plant','Electrical','Min. of Defence',2],
+ ['GEM/26/B/7588120','Repair & overhaul — online UPS','Maintenance','Min. of Steel',5],
+ ['GEM/26/B/7581874','Desktop computers, 24" monitor','IT/Software','Min. of Home Affairs',9],
+ ['VPT/297370','Maintenance dredging, approach channel','Dredging','Vizag Port Trust',21],
+ ['IPRC/88412','Onshore facilities, Akhnoor & Reasi','Port','Indian Port Rail',22],
+];
+const tick=T.map(([id,t,c,b,d])=>`<span><span class="text-[var(--sf)]">● NEW</span> <span class="text-white">${t}</span> <span class="text-[#6d7166]">${id} · ${c} · T-${d}d</span></span>`).join('');
+document.getElementById('ticker').innerHTML=tick+tick;
+document.getElementById('hist').innerHTML=[12,9,6,4,3,5,9,18,30,44,52,61,48,40,37,33,29,26,20,16,14,11,9,8].map((h,i)=>`<span class="flex-1" style="height:${h/61*100}%;background:${i==11?'#ff9933':'#3a3e33'}"></span>`).join('');
+document.getElementById('tabs').innerHTML=['ALL','ELEC','MAINT','IT','PORT'].map((t,i)=>`<span class="px-2 py-0.5 ${i?'text-[#8b8f84] border border-[var(--line)]':'bg-[var(--sf)] text-black'}">${t}</span>`).join('');
+document.getElementById('rows').innerHTML=T.map(([id,t,c,b,d])=>{const heat=d<=2?'bg-[#3a1a0c] text-[var(--sf)]':d<=7?'bg-[#2a2410] text-[#e8c35a]':'text-[#8b8f84]';return `
+ <tr class="border-b border-[var(--line)]/60">
+  <td class="px-4 py-3 text-[#8b8f84]">${id}</td>
+  <td class="px-4 py-3 font-medium text-white" style="font-family:Barlow">${t}</td>
+  <td class="px-4 py-3"><span class="border border-[var(--line)] px-1.5 py-0.5 text-[11px] uppercase">${c}</span></td>
+  <td class="px-4 py-3 text-[#8b8f84]">${b}</td>
+  <td class="px-4 py-3 text-right"><span class="px-2 py-1 font-semibold ${heat}">${String(d).padStart(2,'0')}d</span></td>
+  <td class="px-4 py-3 text-right text-[#6d7166]"><i data-lucide="chevron-right"></i></td>
+ </tr>`}).join('');
+document.getElementById('load').innerHTML=[['MAINT',1940],['ELEC',1412],['IT/SW',1108],['ROAD',846],['PORT',312]].map(([n,v])=>`
+ <div class="mono flex items-center gap-2 text-[11px]"><span class="w-12 text-[#8b8f84]">${n}</span>
+ <div class="flex flex-1 gap-[2px]">${Array.from({length:20},(_,i)=>`<span class="h-3 flex-1 ${i<v/97?'bg-[var(--sf)]':'bg-[#23261f]'}"></span>`).join('')}</div>
+ <span class="w-10 text-right text-white">${v}</span></div>`).join('');
+lucide.createIcons();
+</script>
+</body>
+</html>

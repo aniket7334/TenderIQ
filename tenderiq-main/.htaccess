@@ -1,0 +1,16 @@
+RewriteEngine On
+
+# Proxy API requests to backend (Node.js on port 4000)
+RewriteRule ^api/(.*)$ http://127.0.0.1:4000/$1 [P,L]
+
+# Proxy all other requests to Next.js frontend (Node.js on port 3000)
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
+
+# Proxy headers
+RequestHeader set X-Forwarded-Proto "https"
+RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
+ProxyPreserveHost On
+ProxyPassReverse / http://127.0.0.1:3000/
+ProxyPassReverse /api/ http://127.0.0.1:4000/

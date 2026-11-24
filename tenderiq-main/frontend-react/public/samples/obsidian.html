@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TenderIQ · Obsidian</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root { --bg:#07070a; --line:rgba(255,255,255,.07); --em:#34d399; --cy:#22d3ee; }
+  body { font-family: Manrope, sans-serif; background: var(--bg); color:#e7e7ea; }
+  .serif { font-family: 'Instrument Serif', serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .aurora::before { content:''; position:fixed; inset:-20% -10% auto -10%; height:620px; pointer-events:none;
+    background: radial-gradient(40% 60% at 25% 30%, rgba(52,211,153,.22), transparent 70%),
+                radial-gradient(35% 55% at 70% 10%, rgba(34,211,238,.18), transparent 70%),
+                radial-gradient(30% 50% at 90% 50%, rgba(129,140,248,.12), transparent 70%); filter: blur(20px); }
+  .grain::after { content:''; position:fixed; inset:0; pointer-events:none; opacity:.06; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .glass { background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid var(--line); backdrop-filter: blur(14px); }
+  .ring-grad { position:relative; }
+  .ring-grad::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+    background: linear-gradient(135deg, rgba(52,211,153,.7), rgba(34,211,238,.15) 40%, transparent 60%, rgba(129,140,248,.5));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  [data-lucide] { width:16px; height:16px; stroke-width:1.75; }
+  .rise { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes rise { from { transform: translateY(14px); } }
+  .row:hover { background: linear-gradient(90deg, rgba(52,211,153,.06), transparent 60%); }
+  .row:hover .arrow { transform: translateX(3px); opacity:1; }
+</style>
+</head>
+<body class="aurora grain min-h-screen">
+<div class="relative mx-auto flex max-w-[1440px] gap-6 p-5">
+
+  <!-- Sidebar -->
+  <aside class="glass rise sticky top-5 flex h-[calc(100vh-40px)] w-[232px] shrink-0 flex-col rounded-3xl p-5" style="animation-delay:.05s">
+    <div class="flex items-center gap-2.5">
+      <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-300 to-cyan-400 text-[#07070a]"><span class="serif text-xl italic leading-none">t</span></div>
+      <div><p class="font-semibold tracking-tight">TenderIQ</p><p class="text-[11px] text-white/40">Intelligence suite</p></div>
+    </div>
+    <nav class="mt-9 space-y-1 text-[13.5px]">
+      <a class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white"><i data-lucide="sparkles"></i>Overview</a>
+      <a class="ring-grad flex items-center gap-3 rounded-xl bg-white/[.06] px-3 py-2.5 text-white"><i data-lucide="radar"></i>Tender radar<span class="mono ml-auto text-[10px] text-emerald-300">8.4k</span></a>
+      <a class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white"><i data-lucide="bookmark"></i>Shortlist<span class="mono ml-auto text-[10px] text-white/30">57</span></a>
+      <a class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white"><i data-lucide="scroll-text"></i>Bid notes</a>
+      <a class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white"><i data-lucide="bell-ring"></i>Alerts<span class="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]"></span></a>
+    </nav>
+    <p class="mb-2 mt-8 px-3 text-[10px] uppercase tracking-[.2em] text-white/25">Sources</p>
+    <div class="space-y-2 px-3 text-[12.5px] text-white/55">
+      <div class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>GeM</span><span class="mono text-white/30">live</span></div>
+      <div class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>eTenders</span><span class="mono text-white/30">live</span></div>
+      <div class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>CPPP</span><span class="mono text-white/30">paused</span></div>
+    </div>
+    <div class="glass mt-auto rounded-2xl p-3.5">
+      <div class="flex items-center gap-2.5"><div class="h-8 w-8 rounded-full bg-[conic-gradient(from_200deg,#34d399,#22d3ee,#818cf8,#34d399)] p-[2px]"><div class="flex h-full w-full items-center justify-center rounded-full bg-[#0d0d12] text-[11px] font-semibold">AD</div></div>
+      <div class="leading-tight"><p class="text-[13px] font-medium">Aarav Desai</p><p class="text-[11px] text-white/40">Bid manager</p></div></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="min-w-0 flex-1">
+    <header class="rise flex items-center gap-4 py-2" style="animation-delay:.1s">
+      <div>
+        <p class="mono text-[11px] uppercase tracking-[.25em] text-emerald-300/80">Tuesday · 24 Nov 2026</p>
+        <h1 class="serif mt-1 text-[52px] leading-[1] tracking-tight">Good morning, <span class="italic text-white/60">Aarav.</span></h1>
+      </div>
+      <div class="glass ml-auto flex w-[340px] items-center gap-2.5 rounded-2xl px-4 py-3 text-sm text-white/40"><i data-lucide="search"></i>Search bids, ministries, keywords<kbd class="mono ml-auto rounded-md border border-white/10 px-1.5 text-[10px]">⌘K</kbd></div>
+      <button class="flex h-11 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-semibold text-[#07070a] shadow-[0_10px_40px_-10px_rgba(52,211,153,.6)]"><i data-lucide="zap"></i>Scrape now</button>
+    </header>
+
+    <!-- Bento -->
+    <section class="mt-6 grid grid-cols-12 gap-4">
+      <div class="glass ring-grad rise col-span-5 overflow-hidden rounded-3xl p-6" style="animation-delay:.15s">
+        <div class="flex items-center justify-between text-[12px] text-white/45"><span>Closing in the next 48 hours</span><span class="mono rounded-full bg-amber-400/10 px-2 py-0.5 text-amber-300">urgent</span></div>
+        <p class="serif mt-3 text-[86px] leading-none">1,206</p>
+        <p class="mt-2 text-sm text-white/50">tenders need a decision · <span class="text-emerald-300">142 match your keywords</span></p>
+        <svg viewBox="0 0 400 90" class="mt-5 h-[90px] w-full" preserveAspectRatio="none">
+          <defs><linearGradient id="g1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".45"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/></linearGradient></defs>
+          <path d="M0,70 C30,62 50,40 80,48 S130,72 160,55 S210,18 240,30 S300,66 330,40 S380,12 400,20 L400,90 L0,90Z" fill="url(#g1)"/>
+          <path d="M0,70 C30,62 50,40 80,48 S130,72 160,55 S210,18 240,30 S300,66 330,40 S380,12 400,20" fill="none" stroke="#34d399" stroke-width="2"/>
+          <circle cx="400" cy="20" r="4" fill="#34d399"/><circle cx="400" cy="20" r="10" fill="#34d399" opacity=".2"/>
+        </svg>
+      </div>
+      <div class="col-span-7 grid grid-cols-2 gap-4">
+        <div class="glass rise rounded-3xl p-5" style="animation-delay:.2s">
+          <p class="text-[12px] text-white/45">Live across India</p>
+          <p class="serif mt-2 text-5xl">8,412</p>
+          <p class="mono mt-1 text-[11px] text-emerald-300">▲ 312 published today</p>
+        </div>
+        <div class="glass rise rounded-3xl p-5" style="animation-delay:.25s">
+          <p class="text-[12px] text-white/45">Your win-rate signal</p>
+          <div class="mt-2 flex items-end gap-3"><p class="serif text-5xl">68<span class="text-2xl text-white/40">%</span></p>
+          <div class="mb-2 flex h-9 items-end gap-1" id="bars"></div></div>
+          <p class="mono mt-1 text-[11px] text-white/40">fit score on shortlisted bids</p>
+        </div>
+        <div class="glass rise col-span-2 rounded-3xl p-5" style="animation-delay:.3s">
+          <div class="flex items-center justify-between"><p class="text-[12px] text-white/45">Where the demand is</p><p class="mono text-[11px] text-white/30">by category · live</p></div>
+          <div class="mt-4 space-y-2.5" id="cats"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- List -->
+    <section class="glass rise mt-4 rounded-3xl" style="animation-delay:.38s">
+      <div class="flex items-center gap-3 border-b border-white/[.06] px-6 py-4">
+        <h2 class="serif text-2xl">Tender radar</h2>
+        <div class="ml-4 flex gap-1.5 text-[12px]" id="chips"></div>
+        <span class="mono ml-auto text-[11px] text-white/30">sorted by urgency</span>
+      </div>
+      <div id="rows"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const T=[
+ ['Off-grid solar photovoltaic (PV) power plant','GEM/2026/B/7590396','Ministry of Defence','Electrical',2,94],
+ ['LED luminaire for road and street lighting','GEM/2026/B/7579011','Ministry of Power','Road',1,88],
+ ['Repair and overhauling service — online UPS','GEM/2026/B/7588120','Ministry of Steel','Maintenance',5,81],
+ ['Desktop computers with 24" monitor','GEM/2026/B/7581874','Ministry of Home Affairs','IT/Software',9,74],
+ ['Maintenance dredging of approach channel','2026_VPT_297370_1','Visakhapatnam Port Trust','Dredging',21,97],
+ ['Development of onshore facilities, Akhnoor','2026_IPRC_88412_1','Indian Port Rail Corp.','Port',22,90],
+];
+const C={Electrical:'#fbbf24',Road:'#a1a1aa',Maintenance:'#34d399','IT/Software':'#a78bfa',Dredging:'#22d3ee',Port:'#60a5fa'};
+document.getElementById('bars').innerHTML=[30,55,40,70,60,85,68].map((h,i)=>`<span class="w-1.5 rounded-full" style="height:${h}%;background:${i==6?'#34d399':'rgba(255,255,255,.15)'}"></span>`).join('');
+document.getElementById('cats').innerHTML=[['Maintenance',1940],['Electrical',1412],['IT/Software',1108],['Road',846],['Port & maritime',312]].map(([n,v])=>`
+ <div class="flex items-center gap-3 text-[13px]"><span class="w-32 text-white/60">${n}</span>
+ <div class="h-2 flex-1 overflow-hidden rounded-full bg-white/[.05]"><div class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400" style="width:${v/19.4}%"></div></div>
+ <span class="mono w-12 text-right text-[12px] text-white/50">${v.toLocaleString()}</span></div>`).join('');
+document.getElementById('chips').innerHTML=['All','Electrical','Maintenance','IT/Software','Port'].map((c,i)=>`<span class="rounded-full px-3 py-1 ${i?'text-white/50 hover:text-white':'bg-white text-[#07070a] font-semibold'}">${c}</span>`).join('');
+document.getElementById('rows').innerHTML=T.map(([t,no,b,c,d,fit],i)=>`
+ <div class="row group flex items-center gap-5 border-b border-white/[.04] px-6 py-4 transition last:border-0">
+  <span class="mono w-6 text-[11px] text-white/25">${String(i+1).padStart(2,'0')}</span>
+  <div class="min-w-0 flex-1"><p class="truncate text-[15px] font-medium text-white/90">${t}</p>
+   <p class="mono mt-0.5 text-[11px] text-white/35">${no} · ${b}</p></div>
+  <span class="flex w-32 items-center gap-2 text-[12.5px] text-white/60"><span class="h-2 w-2 rounded-full" style="background:${C[c]};box-shadow:0 0 12px ${C[c]}"></span>${c}</span>
+  <div class="w-28"><div class="flex justify-between text-[10px] text-white/35"><span>fit</span><span class="mono">${fit}</span></div>
+   <div class="mt-1 h-1 rounded-full bg-white/[.06]"><div class="h-1 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-300" style="width:${fit}%"></div></div></div>
+  <span class="mono w-20 text-right text-[13px] ${d<=2?'text-rose-300':d<=7?'text-amber-300':'text-white/50'}">${d}d left</span>
+  <i data-lucide="arrow-up-right" class="arrow text-white/40 opacity-0 transition"></i>
+ </div>`).join('');
+lucide.createIcons();
+</script>
+</body>
+</html>

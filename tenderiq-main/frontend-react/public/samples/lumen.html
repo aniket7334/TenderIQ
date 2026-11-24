@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TenderIQ · Lumen Spatial</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<style>
+  body { font-family: Urbanist, sans-serif; color:#fff; min-height:100vh;
+    background: radial-gradient(120% 80% at 20% 0%, #5b6b8c 0%, #2c3446 45%, #161a24 100%); overflow-x:hidden; }
+  .scene { perspective: 1800px; }
+  .pane { background: rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22); backdrop-filter: blur(40px) saturate(180%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 40px 80px -30px rgba(0,0,0,.6); }
+  .pane-strong { background: rgba(255,255,255,.18); }
+  .tilt { transition: transform .5s cubic-bezier(.2,.8,.2,1), box-shadow .5s; transform-style: preserve-3d; }
+  .tilt:hover { transform: translateZ(30px) rotateX(2deg); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 60px 100px -30px rgba(0,0,0,.7); }
+  .orb { position:absolute; border-radius:50%; filter: blur(60px); }
+  [data-lucide] { width:18px; height:18px; stroke-width:2; }
+  .float { animation: float 7s ease-in-out infinite alternate; } @keyframes float { to { transform: translateY(-10px); } }
+  .enter { animation: enter 1s cubic-bezier(.2,.8,.2,1) both; } @keyframes enter { from { transform: translateY(30px) scale(.96); } }
+  .seg { color: rgba(255,255,255,.65); } .seg.on { background: rgba(255,255,255,.9); color:#161a24; }
+</style>
+</head>
+<body>
+<div class="orb" style="width:520px;height:520px;left:-160px;top:220px;background:#7aa7ff;opacity:.35"></div>
+<div class="orb" style="width:460px;height:460px;right:-120px;top:-120px;background:#ffb38a;opacity:.3"></div>
+
+<div class="scene relative mx-auto flex max-w-[1420px] gap-6 px-8 py-8">
+  <!-- Floating tab bar -->
+  <nav class="pane enter flex h-fit flex-col items-center gap-3 rounded-[32px] p-3">
+    <span class="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[15px] font-extrabold text-[#161a24]">tq</span>
+    <span class="mt-2 flex h-12 w-12 items-center justify-center rounded-full text-white/70"><i data-lucide="home"></i></span>
+    <span class="flex h-12 w-12 items-center justify-center rounded-full bg-white/25"><i data-lucide="layers"></i></span>
+    <span class="flex h-12 w-12 items-center justify-center rounded-full text-white/70"><i data-lucide="bookmark"></i></span>
+    <span class="flex h-12 w-12 items-center justify-center rounded-full text-white/70"><i data-lucide="bell"></i></span>
+    <span class="flex h-12 w-12 items-center justify-center rounded-full text-white/70"><i data-lucide="settings"></i></span>
+  </nav>
+
+  <div class="min-w-0 flex-1">
+    <!-- Title + segmented -->
+    <div class="enter flex items-center gap-4" style="animation-delay:.05s">
+      <h1 class="text-[44px] font-bold tracking-tight">Tenders</h1>
+      <div class="pane ml-4 flex gap-1 rounded-full p-1 text-[14px] font-semibold">
+        <span class="seg on rounded-full px-5 py-2">For you</span><span class="seg rounded-full px-5 py-2">Closing soon</span><span class="seg rounded-full px-5 py-2">All India</span>
+      </div>
+      <div class="pane ml-auto flex w-80 items-center gap-2 rounded-full px-5 py-3 text-[15px] text-white/60"><i data-lucide="mic"></i>Search or speak</div>
+    </div>
+
+    <div class="mt-7 grid grid-cols-12 gap-6">
+      <!-- Hero window -->
+      <div class="pane tilt enter col-span-8 rounded-[36px] p-8" style="animation-delay:.12s">
+        <div class="flex items-start justify-between">
+          <div><p class="text-[15px] font-medium text-white/60">Needs a decision today</p><p class="mt-1 text-[96px] font-extrabold leading-none tracking-[-.04em]">1,206</p><p class="text-[18px] text-white/70">tenders close within 48 hours · <span class="font-semibold text-white">142 match you</span></p></div>
+          <div class="float pane pane-strong rounded-[28px] p-5 text-center"><p class="text-[13px] text-white/60">Live in India</p><p class="text-[40px] font-bold leading-tight">8,412</p><p class="text-[13px] font-semibold text-emerald-300">+312 today</p></div>
+        </div>
+        <div class="mt-8 flex h-28 items-end gap-2" id="bars"></div>
+        <div class="mt-2 flex justify-between text-[12px] text-white/40"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      </div>
+      <!-- Side windows -->
+      <div class="col-span-4 space-y-6">
+        <div class="pane tilt enter rounded-[36px] p-6" style="animation-delay:.2s">
+          <p class="text-[15px] font-medium text-white/60">Up next</p>
+          <p class="mt-2 text-[24px] font-bold leading-tight">LED luminaire for road &amp; street lighting</p>
+          <p class="mt-1 text-[14px] text-white/60">Ministry of Power · GeM</p>
+          <div class="mt-5 flex items-center gap-3"><div class="h-2 flex-1 rounded-full bg-white/15"><div class="h-2 w-[92%] rounded-full bg-gradient-to-r from-amber-300 to-rose-400"></div></div><span class="text-[14px] font-bold text-rose-300">23 h</span></div>
+          <div class="mt-5 grid grid-cols-2 gap-2"><button class="rounded-full bg-white py-3 text-[14px] font-bold text-[#161a24]">Shortlist</button><button class="pane rounded-full py-3 text-[14px] font-semibold">Details</button></div>
+        </div>
+        <div class="pane tilt enter rounded-[36px] p-6" style="animation-delay:.28s">
+          <p class="text-[15px] font-medium text-white/60">Your sectors</p>
+          <div class="mt-4 flex flex-wrap gap-2" id="sectors"></div>
+        </div>
+      </div>
+
+      <!-- Floating tender windows -->
+      <div class="col-span-12 grid grid-cols-4 gap-6" id="cards"></div>
+    </div>
+  </div>
+</div>
+<script>
+const T=[['Off-grid solar PV power plant','Ministry of Defence','Electrical',2,'sun'],['Repair & overhauling — online UPS','Ministry of Steel','Maintenance',5,'wrench'],['Desktop computers, 24" monitor','Ministry of Home Affairs','IT/Software',9,'monitor'],['Maintenance dredging, approach channel','Visakhapatnam Port Trust','Dredging',21,'ship']];
+document.getElementById('bars').innerHTML=[48,62,40,78,96,58,70].map((h,i)=>`<div class="flex-1 rounded-2xl ${i==4?'bg-white':'bg-white/20'}" style="height:${h}%"></div>`).join('');
+document.getElementById('sectors').innerHTML=[['Maintenance',1940],['Electrical',1412],['IT/Software',1108],['Road',846],['Port',312],['Dredging',96]].map(([n,v],i)=>`<span class="rounded-full ${i<2?'bg-white text-[#161a24]':'bg-white/15'} px-4 py-2 text-[14px] font-semibold">${n} <span class="opacity-60">${v.toLocaleString()}</span></span>`).join('');
+document.getElementById('cards').innerHTML=T.map(([t,b,c,d,ic],i)=>`
+ <article class="pane tilt enter cursor-pointer rounded-[32px] p-6" style="animation-delay:${.34+i*.07}s">
+  <div class="flex items-center justify-between"><span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20"><i data-lucide="${ic}"></i></span>
+   <span class="rounded-full px-3 py-1 text-[13px] font-bold ${d<=2?'bg-rose-400/90':d<=7?'bg-amber-300/90 text-[#161a24]':'bg-white/20'}">${d}d</span></div>
+  <p class="mt-5 text-[13px] font-semibold uppercase tracking-wider text-white/50">${c}</p>
+  <p class="mt-1 text-[20px] font-bold leading-snug">${t}</p>
+  <p class="mt-2 text-[14px] text-white/60">${b}</p>
+ </article>`).join('');
+lucide.createIcons();
+</script>
+</body>
+</html>

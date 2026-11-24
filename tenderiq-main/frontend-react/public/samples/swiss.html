@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TenderIQ · Swiss Precision</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800;900&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --red:#e30613; --ink:#0d0d0d; --bg:#f2f2ef; }
+  body { font-family:'Schibsted Grotesk', sans-serif; background: var(--bg); color: var(--ink); }
+  .mono { font-family:'Azeret Mono', monospace; }
+  .grid12 { display:grid; grid-template-columns: repeat(12, minmax(0,1fr)); column-gap: 24px; }
+  .hair { border-color: var(--ink); }
+  .slide { animation: slide .9s cubic-bezier(.7,0,.2,1) both; } @keyframes slide { from { transform: translateX(-24px); } }
+  .row:hover { background: var(--ink); color: var(--bg); }
+  .row:hover .sub { color: #bdbdb8; } .row:hover .redt { color: #ff5a63; }
+</style>
+</head>
+<body class="min-h-screen">
+<div class="mx-auto max-w-[1400px] px-10">
+  <!-- Header row -->
+  <header class="grid12 items-center border-b-2 hair py-4">
+    <div class="col-span-3 flex items-center gap-3"><span class="block h-7 w-7 bg-[var(--red)]"></span><span class="text-[22px] font-black tracking-[-.04em]">TenderIQ</span></div>
+    <nav class="col-span-6 flex gap-8 text-[14px] font-medium"><a class="border-b-2 border-[var(--red)]">Tenders</a><a class="text-[#7a7a75]">Shortlist</a><a class="text-[#7a7a75]">Notes</a><a class="text-[#7a7a75]">Alerts</a><a class="text-[#7a7a75]">Sources</a></nav>
+    <div class="mono col-span-3 text-right text-[11px] uppercase text-[#7a7a75]">24.11.2026 — 11:42 IST</div>
+  </header>
+
+  <!-- Hero -->
+  <section class="grid12 border-b hair pb-8 pt-10">
+    <div class="slide col-span-7">
+      <p class="mono text-[11px] uppercase tracking-wider text-[var(--red)]">01 / Live tenders, India</p>
+      <p class="mt-2 text-[220px] font-black leading-[.78] tracking-[-.07em]">8412</p>
+    </div>
+    <div class="col-span-5 flex flex-col justify-end">
+      <p class="text-[34px] font-bold leading-[1.05] tracking-[-.03em]">Every government tender in your sectors. <span class="text-[var(--red)]">One list.</span> Sorted by what closes first.</p>
+      <div class="mt-8 grid grid-cols-3 border-t-2 hair">
+        <div class="border-r hair pr-4 pt-3"><p class="text-[44px] font-black leading-none tracking-[-.05em] text-[var(--red)]">1206</p><p class="mono mt-1 text-[10px] uppercase">Close &lt; 48 h</p></div>
+        <div class="border-r hair px-4 pt-3"><p class="text-[44px] font-black leading-none tracking-[-.05em]">312</p><p class="mono mt-1 text-[10px] uppercase">New today</p></div>
+        <div class="pl-4 pt-3"><p class="text-[44px] font-black leading-none tracking-[-.05em]">57</p><p class="mono mt-1 text-[10px] uppercase">Shortlisted</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sector strip -->
+  <section class="grid12 border-b hair py-6">
+    <p class="mono col-span-2 text-[11px] uppercase tracking-wider text-[var(--red)]">02 / Sectors</p>
+    <div class="col-span-10 flex h-14 items-stretch" id="strip"></div>
+  </section>
+
+  <!-- Table -->
+  <section class="pb-16 pt-6">
+    <div class="grid12 items-end">
+      <p class="mono col-span-2 text-[11px] uppercase tracking-wider text-[var(--red)]">03 / Closing first</p>
+      <div class="col-span-10 flex items-center gap-2 text-[13px] font-medium" id="filters"></div>
+    </div>
+    <div class="mt-5 border-t-2 hair">
+      <div class="grid12 mono border-b hair py-2 text-[10px] uppercase text-[#7a7a75]"><span class="col-span-1">Days</span><span class="col-span-6">Tender</span><span class="col-span-2">Sector</span><span class="col-span-2">Buyer</span><span class="col-span-1 text-right">Src</span></div>
+      <div id="rows"></div>
+    </div>
+  </section>
+</div>
+<script>
+const T=[['LED luminaire for road and street lighting','GEM/2026/B/7579011','Road','Ministry of Power',1,'GeM'],['Off-grid solar photovoltaic power plant','GEM/2026/B/7590396','Electrical','Ministry of Defence',2,'GeM'],['Repair and overhauling — online UPS','GEM/2026/B/7588120','Maintenance','Ministry of Steel',5,'GeM'],['Desktop computers, 24" monitor','GEM/2026/B/7581874','IT/Software','Ministry of Home Affairs',9,'GeM'],['Maintenance dredging of approach channel','2026_VPT_297370_1','Dredging','Visakhapatnam Port Trust',21,'eTend'],['Onshore facilities at Akhnoor and Reasi','2026_IPRC_88412_1','Port','Indian Port Rail Corp.',22,'eTend']];
+document.getElementById('strip').innerHTML=[['Maintenance',23],['Electrical',17],['IT/Software',13],['Road',10],['Port',4],['Other',33]].map(([n,p],i)=>`
+ <div class="flex flex-col justify-between border-l-2 hair px-3 py-1 ${i==0?'bg-[var(--red)] text-white border-[var(--red)]':''}" style="width:${p}%"><span class="text-[13px] font-bold leading-none">${n}</span><span class="mono text-[11px]">${p}%</span></div>`).join('');
+document.getElementById('filters').innerHTML=['All','Electrical','Maintenance','IT/Software','Port','Road'].map((f,i)=>`<span class="border-2 hair px-3 py-1 ${i?'':'bg-[var(--ink)] text-[var(--bg)]'}">${f}</span>`).join('');
+document.getElementById('rows').innerHTML=T.map(([t,no,c,b,d,s])=>`
+ <div class="row grid12 cursor-pointer items-baseline border-b hair py-4 transition-colors">
+  <span class="redt col-span-1 text-[42px] font-black leading-none tracking-[-.05em] ${d<=2?'text-[var(--red)]':''}">${String(d).padStart(2,'0')}</span>
+  <div class="col-span-6"><p class="text-[22px] font-bold leading-tight tracking-[-.02em]">${t}</p><p class="sub mono mt-1 text-[11px] text-[#7a7a75]">${no}</p></div>
+  <span class="col-span-2 text-[15px] font-medium">${c}</span>
+  <span class="sub col-span-2 text-[14px] text-[#55554f]">${b}</span>
+  <span class="mono col-span-1 text-right text-[11px] uppercase">${s}</span>
+ </div>`).join('');
+</script>
+</body>
+</html>

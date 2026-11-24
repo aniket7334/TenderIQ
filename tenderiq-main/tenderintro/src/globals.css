@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #F4EFE5;
+  --paper-deep: #EBE3D2;
+  --ink: #15130F;
+  --ink-soft: #3F3B33;
+  --ink-mute: #7A736A;
+  --ink-fade: #B0A89C;
+  --ink-line: rgba(21, 19, 15, 0.12);
+  --signal: #E0531B;
+  --navy: #0D1B33;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--paper);
+}
+
+body {
+  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background: var(--paper);
+  color: var(--ink);
+  /* Subtle paper grain — survives zoom, very light */
+  background-image:
+    radial-gradient(circle at 0 0, rgba(21,19,15,0.018) 1px, transparent 1px),
+    radial-gradient(circle at 12px 12px, rgba(21,19,15,0.018) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Tabular figures by default for mono — for stat counters */
+.font-mono {
+  font-feature-settings: 'ss01', 'tnum', 'zero';
+  font-variant-numeric: tabular-nums;
+}
+
+/* Variable-axis tuning for display serif */
+.font-display {
+  font-optical-sizing: auto;
+  font-variation-settings: 'SOFT' 30, 'opsz' 96;
+}
+.font-display-italic {
+  font-style: italic;
+  font-variation-settings: 'SOFT' 80, 'opsz' 96;
+}
+
+@layer utilities {
+  /* Single accent — used VERY sparingly */
+  .text-signal { color: var(--signal); }
+
+  /* Hairline rule, full-width */
+  .rule-ink {
+    height: 1px;
+    background: var(--ink);
+    opacity: 0.85;
+  }
+  .rule-ink-soft {
+    height: 1px;
+    background: var(--ink-line);
+  }
+
+  /* DATELINE chip — used above sections */
+  .dateline {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  /* Reveal helpers (kept for the GSAP hook) */
+  .reveal-init { opacity: 0; transform: translateY(20px); }
+
+  /* Mask edges for marquee fade */
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(
+      to right, transparent, black 6%, black 94%, transparent
+    );
+    mask-image: linear-gradient(
+      to right, transparent, black 6%, black 94%, transparent
+    );
+  }
+
+  /* Hide scrollbar on tracks */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Editorial drop-cap helper */
+  .drop-cap::first-letter {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 4.2em;
+    line-height: 0.85;
+    float: left;
+    padding-right: 0.08em;
+    padding-top: 0.05em;
+    color: var(--signal);
+    font-variation-settings: 'SOFT' 60, 'opsz' 144;
+  }
+
+  /* Marker glyph — section number indicator */
+  .marker::before {
+    content: '§';
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    margin-right: 0.35em;
+    color: var(--signal);
+  }
+
+  /* Underline link — newspaper style */
+  .ink-link {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--ink-fade);
+    transition: text-decoration-color 0.2s ease;
+  }
+  .ink-link:hover {
+    text-decoration-color: var(--signal);
+    color: var(--signal);
+  }
+}

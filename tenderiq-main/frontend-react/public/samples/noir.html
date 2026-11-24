@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TenderIQ · Noir Deco</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Josefin+Sans:wght@300;400;600&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root { --gold:#d4b47c; --gold2:#9c7d48; --ink:#0b0a08; --card:#12110e; --line:rgba(212,180,124,.22); }
+  body { font-family:'Josefin Sans', sans-serif; background: var(--ink); color:#e9e2d3; letter-spacing:.02em; }
+  .cg { font-family:'Cormorant Garamond', serif; letter-spacing:0; }
+  .gold { color: var(--gold); }
+  .goldtext { background: linear-gradient(180deg,#f3dfb4,#d4b47c 45%,#8a6a35); -webkit-background-clip:text; color:transparent; }
+  .deco { border:1px solid var(--line); position:relative; background: linear-gradient(180deg,#15130f,#0f0e0b); }
+  .deco::before { content:''; position:absolute; inset:6px; border:1px solid rgba(212,180,124,.1); pointer-events:none; }
+  .fan { background:
+      repeating-conic-gradient(from 270deg at 50% 100%, rgba(212,180,124,.14) 0 2deg, transparent 2deg 9deg); }
+  .chev { background-image: linear-gradient(135deg, var(--line) 25%, transparent 25%), linear-gradient(225deg, var(--line) 25%, transparent 25%);
+          background-size: 14px 14px; height:8px; opacity:.7; }
+  [data-lucide] { width:15px; height:15px; stroke-width:1.4; }
+  .up { animation: up 1s cubic-bezier(.2,.7,.2,1) both; } @keyframes up { from { transform: translateY(12px); } }
+  .tr:hover { background: linear-gradient(90deg, rgba(212,180,124,.08), transparent); }
+  .tr:hover .nm { color: var(--gold); }
+</style>
+</head>
+<body class="min-h-screen">
+<!-- Top -->
+<header class="border-b border-[var(--line)]">
+  <div class="mx-auto flex max-w-[1360px] items-center px-10 py-5">
+    <nav class="flex gap-8 text-[11px] uppercase tracking-[.3em] text-[#a89f8c]"><a class="gold">Tenders</a><a>Shortlist</a><a>Dossiers</a><a>Alerts</a></nav>
+    <div class="mx-auto flex flex-col items-center">
+      <svg width="46" height="24" viewBox="0 0 46 24" class="mb-1"><path d="M23 2 L44 22 H2 Z" fill="none" stroke="#d4b47c"/><path d="M23 8 L36 22 H10 Z" fill="none" stroke="#d4b47c" opacity=".6"/><line x1="23" y1="2" x2="23" y2="22" stroke="#d4b47c" opacity=".6"/></svg>
+      <p class="cg goldtext text-[28px] font-semibold leading-none tracking-[.12em]">TENDERIQ</p>
+    </div>
+    <div class="flex items-center gap-6 text-[11px] uppercase tracking-[.3em] text-[#a89f8c]"><span class="flex items-center gap-2"><i data-lucide="search"></i>Search</span><span class="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] cg text-base normal-case tracking-normal gold">A</span></div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-[1360px] px-10">
+  <!-- Hero -->
+  <section class="up fan relative mt-8 overflow-hidden border border-[var(--line)] px-12 pb-10 pt-14 text-center">
+    <p class="text-[11px] uppercase tracking-[.5em] text-[#a89f8c]">The private register · 24 November 2026</p>
+    <h1 class="cg mt-5 text-[78px] font-medium leading-[.95]"><span class="goldtext">1,206</span> <em class="font-normal text-[#e9e2d3]">tenders close</em><br/><em class="font-normal text-[#bdb4a0]">before Thursday.</em></h1>
+    <div class="mx-auto mt-6 flex max-w-xl items-center gap-4"><span class="chev flex-1"></span><span class="text-[11px] uppercase tracking-[.4em] gold">142 match your mandate</span><span class="chev flex-1"></span></div>
+    <div class="mt-10 grid grid-cols-4 divide-x divide-[var(--line)] border-t border-[var(--line)] pt-8">
+      <div><p class="cg text-5xl">8,412</p><p class="mt-1 text-[10px] uppercase tracking-[.35em] text-[#a89f8c]">Live in India</p></div>
+      <div><p class="cg text-5xl">312</p><p class="mt-1 text-[10px] uppercase tracking-[.35em] text-[#a89f8c]">Published today</p></div>
+      <div><p class="cg text-5xl">57</p><p class="mt-1 text-[10px] uppercase tracking-[.35em] text-[#a89f8c]">In your dossier</p></div>
+      <div><p class="cg text-5xl">₹412<span class="text-2xl"> Cr</span></p><p class="mt-1 text-[10px] uppercase tracking-[.35em] text-[#a89f8c]">Opportunity value</p></div>
+    </div>
+  </section>
+
+  <section class="mt-8 grid grid-cols-[1fr_320px] gap-8 pb-14">
+    <div class="deco up p-8" style="animation-delay:.15s">
+      <div class="flex items-end justify-between">
+        <h2 class="cg text-[34px] font-medium">The Register</h2>
+        <div class="flex gap-6 text-[10px] uppercase tracking-[.3em] text-[#a89f8c]" id="tabs"></div>
+      </div>
+      <div class="mt-5 border-t border-[var(--line)]" id="rows"></div>
+    </div>
+    <aside class="space-y-8">
+      <div class="deco up p-7 text-center" style="animation-delay:.25s">
+        <p class="text-[10px] uppercase tracking-[.4em] text-[#a89f8c]">Most urgent</p>
+        <div class="relative mx-auto mt-5 h-36 w-36">
+          <svg viewBox="0 0 140 140" class="h-36 w-36 -rotate-90"><circle cx="70" cy="70" r="62" fill="none" stroke="rgba(212,180,124,.12)" stroke-width="2"/><circle cx="70" cy="70" r="62" fill="none" stroke="#d4b47c" stroke-width="2" stroke-dasharray="370 390"/><circle cx="70" cy="70" r="54" fill="none" stroke="rgba(212,180,124,.25)" stroke-dasharray="2 6"/></svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center"><p class="cg goldtext text-[54px] leading-none">23</p><p class="text-[9px] uppercase tracking-[.4em] text-[#a89f8c]">hours</p></div>
+        </div>
+        <p class="cg mt-5 text-[22px] italic leading-snug">LED luminaire for road &amp; street lighting</p>
+        <p class="mt-2 text-[10px] uppercase tracking-[.3em] text-[#a89f8c]">Ministry of Power</p>
+        <button class="mt-6 w-full border border-[var(--gold)] py-3 text-[11px] uppercase tracking-[.4em] gold hover:bg-[var(--gold)] hover:text-black">Open dossier</button>
+      </div>
+      <div class="deco up p-7" style="animation-delay:.35s">
+        <p class="text-[10px] uppercase tracking-[.4em] text-[#a89f8c]">By sector</p>
+        <div class="mt-5 space-y-4" id="sect"></div>
+      </div>
+    </aside>
+  </section>
+</main>
+<script>
+const T=[['Off-grid solar photovoltaic power plant','Ministry of Defence','Electrical',2,'GEM/2026/B/7590396'],['LED luminaire for road and street lighting','Ministry of Power','Road',1,'GEM/2026/B/7579011'],['Repair and overhauling of online UPS','Ministry of Steel','Maintenance',5,'GEM/2026/B/7588120'],['Desktop computers with 24-inch monitor','Ministry of Home Affairs','IT/Software',9,'GEM/2026/B/7581874'],['Maintenance dredging of the approach channel','Visakhapatnam Port Trust','Dredging',21,'2026_VPT_297370_1']];
+const R=['I','II','III','IV','V'];
+document.getElementById('tabs').innerHTML=['All','Electrical','Maintenance','Maritime'].map((t,i)=>`<a class="${i?'':'gold border-b border-[var(--gold)] pb-1'}">${t}</a>`).join('');
+document.getElementById('rows').innerHTML=T.map(([t,b,c,d,no],i)=>`
+ <div class="tr grid cursor-pointer grid-cols-[56px_1fr_160px_90px] items-center gap-5 border-b border-[var(--line)] px-2 py-5 transition">
+  <span class="cg text-2xl italic gold">${R[i]}.</span>
+  <div><p class="nm cg text-[24px] font-medium leading-tight transition-colors">${t}</p><p class="mt-1 text-[10px] uppercase tracking-[.3em] text-[#7f7768]">${no}</p></div>
+  <div><p class="text-[10px] uppercase tracking-[.3em] gold">${c}</p><p class="mt-1 text-[13px] text-[#a89f8c]">${b}</p></div>
+  <div class="text-right"><p class="cg text-[34px] leading-none ${d<=2?'goldtext':''}">${d}</p><p class="text-[9px] uppercase tracking-[.35em] text-[#7f7768]">days</p></div>
+ </div>`).join('');
+document.getElementById('sect').innerHTML=[['Maintenance',1940],['Electrical',1412],['IT & software',1108],['Roads',846],['Maritime',312]].map(([n,v])=>`
+ <div><div class="flex justify-between text-[12px]"><span class="cg text-[17px]">${n}</span><span class="text-[#a89f8c]">${v.toLocaleString()}</span></div>
+ <div class="mt-1.5 h-px bg-[var(--line)]"><div class="h-px bg-[var(--gold)]" style="width:${v/19.4}%"></div></div></div>`).join('');
+lucide.createIcons();
+</script>
+</body>
+</html>

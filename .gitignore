@@ -1,0 +1,57 @@
+# ─── Secrets: never commit ───────────────────────────────
+# All environment files (passwords, API keys, DB URLs, SMTP, JWT secrets)
+.env
+.env.*
+*.env
+!.env.example
+!**/.env.example
+# Keys / certificates / credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa*
+credentials*.json
+service-account*.json
+# Database dumps
+*.sql
+*.sql.gz
+*.sqlite
+*.db
+
+# ─── Archives (tendernew.zip contains a copy of .env) ────
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+
+# ─── Dependencies & builds ──────────────────────────────
+node_modules/
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# ─── Local-only folders ─────────────────────────────────
+# Duplicate copy of the backend
+tenderiq-main/backend-js/tendernew/
+# Local undo backups made during development
+frontend-react-backup-before-classic/
+frontend-react-ts-backup/
+# Editor / tool settings
+.claude/
+.vscode/
+.idea/
+
+# ─── Runtime data ───────────────────────────────────────
+uploads/
+exports/
+*.log
+npm-debug.log*
+
+# ─── OS ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ──────────────────────────────────────────────────────────────
+   Admiralty Modern — design tokens
+   An editorial dashboard aesthetic for a serious maritime B2B tool.
+   Treat the screen like paper on a navigator's desk, not a feed.
+   ────────────────────────────────────────────────────────────── */
+:root {
+  /* Surfaces — warm paper, like an admiralty chart */
+  --paper: 246 242 236;        /* #F6F2EC  base background */
+  --paper-tint: 237 231 221;   /* #EDE7DD  sidebar / sunken */
+  --canvas: 253 250 243;       /* #FDFAF3  card / raised */
+  --canvas-tint: 248 243 232;  /* #F8F3E8  table stripe / hover */
+
+  /* Ink */
+  --ink: 26 29 33;             /* #1A1D21  primary text */
+  --ink-soft: 74 79 87;        /* #4A4F57  secondary */
+  --ink-muted: 138 142 149;    /* #8A8E95  meta / placeholder */
+
+  /* Hairline rules — pressed from ink, never flat gray */
+  --rule: 26 29 33 / 0.10;
+  --rule-strong: 26 29 33 / 0.18;
+  --rule-soft: 26 29 33 / 0.06;
+
+  /* Signals */
+  --navy: 11 46 79;            /* #0B2E4F  primary / admiralty */
+  --navy-hover: 10 38 68;      /* #0A2644 */
+  --navy-ink: 7 28 48;         /* #071C30 */
+  --brass: 181 101 29;         /* #B5651D  accent */
+  --brass-hover: 158 86 22;    /* #9E5616 */
+  --signal: 139 26 26;         /* #8B1A1A  urgent / overdue */
+  --moss: 74 107 63;           /* #4A6B3F  active / success */
+  --amber: 180 120 20;         /* #B47814  closing-soon */
+
+  /* Typography — Next.js injects the three *-face vars from layout.tsx */
+  --font-display: var(--font-display-face), 'Fraunces', 'Iowan Old Style', 'Georgia', serif;
+  --font-sans: var(--font-sans-face), 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+:root[data-theme='dark'] {
+  --paper: 11 14 19;
+  --paper-tint: 17 21 28;
+  --canvas: 20 25 34;
+  --canvas-tint: 24 30 40;
+  --ink: 240 233 220;
+  --ink-soft: 184 180 170;
+  --ink-muted: 132 128 120;
+  --rule: 240 233 220 / 0.10;
+  --rule-strong: 240 233 220 / 0.18;
+  --rule-soft: 240 233 220 / 0.06;
+  --navy: 128 180 220;
+  --navy-hover: 160 200 232;
+  --navy-ink: 92 150 196;
+  --brass: 217 164 103;
+  --brass-hover: 232 182 123;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth antialiased;
+    font-feature-settings: 'ss01', 'cv11', 'cv05';
+  }
+
+  body {
+    background-color: rgb(var(--paper));
+    color: rgb(var(--ink));
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01', 'cv11', 'cv05', 'tnum';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    position: relative;
+  }
+
+  /* Faint paper grain across the whole app — barely visible, adds warmth */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.102  0 0 0 0 0.114  0 0 0 0 0.129  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: multiply;
+  }
+
+  /* Keep real content above the grain */
+  body > * { position: relative; z-index: 1; }
+
+  *:focus-visible {
+    outline: 2px solid rgb(var(--navy));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Display headings use Fraunces by default when h1-h3 */
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-variation-settings: 'opsz' 48, 'SOFT' 50;
+    letter-spacing: -0.015em;
+  }
+
+  /* Number columns, references, ids, deadlines → mono with tabular figures */
+  .mono, .num {
+    font-family: var(--font-mono);
+    font-feature-settings: 'tnum', 'zero';
+  }
+}
+
+@layer components {
+  /* ── Hairline rules ── */
+  .rule-t { border-top: 1px solid rgb(var(--rule)); }
+  .rule-b { border-bottom: 1px solid rgb(var(--rule)); }
+  .rule-l { border-left: 1px solid rgb(var(--rule)); }
+  .rule-r { border-right: 1px solid rgb(var(--rule)); }
+  .rule { border: 1px solid rgb(var(--rule)); }
+  .rule-strong { border: 1px solid rgb(var(--rule-strong)); }
+
+  /* ── Admiralty eyebrow — tiny all-caps label with letter-spacing ── */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--ink-muted));
+    font-weight: 500;
+  }
+
+  .eyebrow-ink {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--ink));
+    font-weight: 500;
+  }
+
+  /* ── Document card: cream canvas with hairline, no shadow ── */
+  .doc {
+    background-color: rgb(var(--canvas));
+    border: 1px solid rgb(var(--rule));
+  }
+
+  /* ── Admiralty button baseline ── */
+  .adm-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 13.5px;
+    letter-spacing: 0.005em;
+    padding: 0.5rem 1rem;
+    border: 1px solid rgb(var(--ink));
+    background: rgb(var(--ink));
+    color: rgb(var(--paper));
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+  .adm-btn:hover { background: rgb(var(--navy-ink)); border-color: rgb(var(--navy-ink)); }
+  .adm-btn-ghost {
+    background: transparent;
+    color: rgb(var(--ink));
+    border-color: rgb(var(--rule-strong));
+  }
+  .adm-btn-ghost:hover { background: rgb(var(--canvas-tint)); border-color: rgb(var(--ink)); }
+
+  /* ── Input baseline ── */
+  .adm-input {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgb(var(--rule-strong));
+    padding: 0.625rem 0;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    color: rgb(var(--ink));
+    transition: border-color 180ms ease;
+  }
+  .adm-input::placeholder { color: rgb(var(--ink-muted)); }
+  .adm-input:focus { outline: none; border-bottom-color: rgb(var(--ink)); }
+
+  /* ── Status pills — outlined, not filled ── */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+
+  /* ── Scrollbars — subtle, ink-tinted ── */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--rule-strong)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--rule-strong));
+    border-radius: 1px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink-soft)); }
+
+  .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+}
+
+@layer utilities {
+  .font-display { font-family: var(--font-display); }
+  .font-sans    { font-family: var(--font-sans); }
+  .font-mono    { font-family: var(--font-mono); }
+
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+}
+
+/* ── Page-load reveal ── */
+@keyframes adm-rise {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.adm-rise      { animation: adm-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.adm-rise-1    { animation: adm-rise 420ms 60ms  cubic-bezier(0.22, 1, 0.36, 1) both; }
+.adm-rise-2    { animation: adm-rise 420ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.adm-rise-3    { animation: adm-rise 420ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.adm-rise-4    { animation: adm-rise 420ms 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.adm-rise-5    { animation: adm-rise 420ms 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes adm-sweep {
+  0%   { stroke-dashoffset: 220; }
+  100% { stroke-dashoffset: 0; }
+}
+.adm-sweep { animation: adm-sweep 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }

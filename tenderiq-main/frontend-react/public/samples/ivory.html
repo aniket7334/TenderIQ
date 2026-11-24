@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TenderIQ · Ivory Ledger</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400&family=Hanken+Grotesk:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root { --paper:#f5efe3; --ink:#17130f; --muted:#7a6f61; --rule:#d9cdb8; --gold:#a7752c; --ox:#7d2a1e; }
+  body { font-family:'Hanken Grotesk', sans-serif; background: var(--paper); color: var(--ink); }
+  .serif { font-family: Fraunces, serif; font-variation-settings: "SOFT" 50; }
+  .mono { font-family: 'DM Mono', monospace; }
+  .paper { background-image: radial-gradient(rgba(23,19,15,.05) 1px, transparent 1px); background-size: 3px 3px; }
+  .rule { border-color: var(--rule); }
+  .smallcaps { font-variant: all-small-caps; letter-spacing: .08em; }
+  [data-lucide] { width:15px; height:15px; stroke-width:1.6; }
+  .fade { animation: fade 1s ease both; }
+  @keyframes fade { from { transform: translateY(8px); } }
+  .entry:hover .title { color: var(--ox); }
+  .entry:hover .go { opacity:1; transform: translateX(0); }
+</style>
+</head>
+<body class="paper min-h-screen">
+<div class="mx-auto max-w-[1320px] px-10">
+
+  <!-- Masthead -->
+  <header class="fade flex items-center justify-between border-b rule py-5 text-[13px]">
+    <nav class="flex gap-7 text-[var(--muted)]"><a class="text-[var(--ink)]">The radar</a><a>Shortlist</a><a>Bid notes</a><a>Alerts</a><a>Sources</a></nav>
+    <p class="serif text-[26px] font-bold tracking-tight">Tender<span class="italic font-normal text-[var(--gold)]">IQ</span></p>
+    <div class="flex items-center gap-5 text-[var(--muted)]"><span class="flex items-center gap-2"><i data-lucide="search"></i>Search the ledger</span><span class="flex h-8 w-8 items-center justify-center rounded-full border rule serif text-[13px] text-[var(--ink)]">AD</span></div>
+  </header>
+  <div class="mono flex justify-between border-b rule py-2 text-[11px] uppercase tracking-[.2em] text-[var(--muted)]">
+    <span>Vol. III · No. 328</span><span>Tuesday, 24 November 2026</span><span>GeM · eTenders · CPPP</span>
+  </div>
+
+  <!-- Lead -->
+  <section class="grid grid-cols-12 gap-10 border-b rule py-10">
+    <div class="fade col-span-7" style="animation-delay:.1s">
+      <p class="smallcaps text-[13px] font-semibold text-[var(--ox)]">The morning brief</p>
+      <h1 class="serif mt-3 text-[64px] font-light leading-[1.02] tracking-[-.02em]">Three hundred and twelve new tenders, <em class="font-normal text-[var(--gold)]">and six that deserve your attention.</em></h1>
+      <p class="mt-6 max-w-[560px] text-[17px] leading-relaxed text-[#4b4236]">Electrical works lead the day with 1,412 live bids. Defence procurement is unusually active, and two dredging contracts on the east coast close within three weeks.</p>
+    </div>
+    <aside class="fade col-span-5 border-l rule pl-10" style="animation-delay:.25s">
+      <div class="grid grid-cols-2 gap-y-8">
+        <div><p class="serif text-[54px] font-light leading-none">8,412</p><p class="smallcaps mt-1 text-[13px] text-[var(--muted)]">live across India</p></div>
+        <div><p class="serif text-[54px] font-light leading-none text-[var(--ox)]">1,206</p><p class="smallcaps mt-1 text-[13px] text-[var(--muted)]">close within 48 hours</p></div>
+        <div><p class="serif text-[54px] font-light leading-none">57</p><p class="smallcaps mt-1 text-[13px] text-[var(--muted)]">on your shortlist</p></div>
+        <div><p class="serif text-[54px] font-light leading-none">₹ 412<span class="text-2xl"> Cr</span></p><p class="smallcaps mt-1 text-[13px] text-[var(--muted)]">value in your sectors</p></div>
+      </div>
+      <div class="mt-8 border-t rule pt-5">
+        <p class="smallcaps text-[13px] font-semibold">Share of today's demand</p>
+        <div class="mt-3 flex h-3 overflow-hidden rounded-sm" id="share"></div>
+        <div class="mono mt-3 grid grid-cols-3 gap-y-1.5 text-[11px] text-[var(--muted)]" id="legend"></div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- Ledger -->
+  <section class="grid grid-cols-12 gap-10 py-10">
+    <div class="col-span-9">
+      <div class="flex items-baseline justify-between border-b-2 border-[var(--ink)] pb-3">
+        <h2 class="serif text-[30px] font-medium">The ledger</h2>
+        <div class="flex gap-5 text-[13px] text-[var(--muted)]" id="tabs"></div>
+      </div>
+      <div id="entries"></div>
+    </div>
+    <aside class="col-span-3">
+      <div class="border-b-2 border-[var(--ink)] pb-3"><h3 class="serif text-[22px] font-medium">Closing first</h3></div>
+      <ol class="mt-2" id="closing"></ol>
+      <div class="mt-8 bg-[var(--ink)] p-6 text-[var(--paper)]">
+        <p class="smallcaps text-[13px] text-[#d8b77a]">Analyst's note</p>
+        <p class="serif mt-3 text-[20px] italic leading-snug">"The Visakhapatnam dredging bid mirrors last year's award — same scope, larger channel."</p>
+        <p class="mono mt-4 text-[11px] uppercase tracking-widest text-[#b9ad98]">— Priya Sharma, analyst</p>
+      </div>
+    </aside>
+  </section>
+</div>
+
+<script>
+const T=[
+ ['Maintenance dredging of the approach channel and turning circle','2026_VPT_297370_1','Visakhapatnam Port Trust','Dredging',21],
+ ['Off-grid solar photovoltaic power plant, 2 units','GEM/2026/B/7590396','Ministry of Defence','Electrical',2],
+ ['LED luminaires for road and street lighting','GEM/2026/B/7579011','Ministry of Power','Road',1],
+ ['Repair and overhauling service for online UPS systems','GEM/2026/B/7588120','Ministry of Steel','Maintenance',5],
+ ['Desktop computers with 24-inch monitors','GEM/2026/B/7581874','Ministry of Home Affairs','IT/Software',9],
+];
+const share=[['Maintenance',23,'#17130f'],['Electrical',17,'#7d2a1e'],['IT/Software',13,'#a7752c'],['Road',10,'#6b5d4b'],['Port',4,'#2f4a56'],['Other',33,'#d9cdb8']];
+document.getElementById('share').innerHTML=share.map(([n,p,c])=>`<span style="width:${p}%;background:${c}"></span>`).join('');
+document.getElementById('legend').innerHTML=share.map(([n,p,c])=>`<span class="flex items-center gap-1.5"><span class="h-2 w-2" style="background:${c}"></span>${n} ${p}%</span>`).join('');
+document.getElementById('tabs').innerHTML=['All sectors','Electrical','Maintenance','Port & maritime'].map((t,i)=>`<a class="${i?'':'text-[var(--ink)] underline decoration-[var(--gold)] decoration-2 underline-offset-[6px]'}">${t}</a>`).join('');
+document.getElementById('entries').innerHTML=T.map(([t,no,b,c,d],i)=>`
+ <article class="entry fade group grid cursor-pointer grid-cols-[64px_1fr_150px_110px] items-baseline gap-6 border-b rule py-6" style="animation-delay:${.35+i*.08}s">
+  <span class="serif text-[40px] font-light leading-none text-[var(--rule)] group-hover:text-[var(--gold)]">${String(i+1).padStart(2,'0')}</span>
+  <div><p class="smallcaps text-[12px] font-semibold text-[var(--gold)]">${c}</p>
+   <h3 class="title serif mt-1 text-[23px] font-medium leading-snug transition-colors">${t}</h3>
+   <p class="mono mt-2 text-[11px] text-[var(--muted)]">${no}</p></div>
+  <p class="text-[14px] leading-snug text-[#4b4236]">${b}</p>
+  <div class="text-right"><p class="serif text-[30px] leading-none ${d<=2?'text-[var(--ox)]':''}">${d}<span class="text-[14px]"> days</span></p><p class="go mono mt-2 flex translate-x-[-4px] items-center justify-end gap-1 text-[11px] uppercase tracking-wider text-[var(--ox)] opacity-0 transition">Read bid <i data-lucide="arrow-right"></i></p></div>
+ </article>`).join('');
+document.getElementById('closing').innerHTML=[...T].sort((a,b)=>a[4]-b[4]).map(([t,,b,,d])=>`
+ <li class="border-b rule py-4"><p class="mono text-[11px] uppercase tracking-wider ${d<=2?'text-[var(--ox)]':'text-[var(--muted)]'}">in ${d} day${d>1?'s':''}</p><p class="serif mt-1 text-[16px] leading-snug">${t}</p></li>`).join('');
+lucide.createIcons();
+</script>
+</body>
+</html>
