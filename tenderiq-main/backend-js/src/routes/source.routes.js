@@ -91,6 +91,41 @@ router.post('/scrape-all', auth_1.authenticate, (0, auth_1.requireRole)('admin')
         res.status(500).json({ detail: 'Internal server error' });
     }
 });
+// POST /scrape-type/:adapter - Scrape only the source(s) of one portal, e.g. "gem"
+// (used by the dashboard's "GeM Now" button). Defined before /:source_id routes.
+router.post('/scrape-type/:adapter', auth_1.authenticate, (0, auth_1.requireRole)('admin'), async (req, res) => {
+    try {
+        const { pool } = require('../db');
+        const adapter = String(req.params.adapter).toLowerCase();
+        const [sources] = await pool.execute(
+            'SELECT id, name FROM tender_sources WHERE adapter_type = ? AND is_active = 1',
+            [adapter]
+        );
+        if (!sources.length)
+            return res.status(404).json({ detail: `No active ${adapter.toUpperCase()} source configured` });
+        for (const s of sources)
+            await (0, scrapeTasks_1.closeStaleRuns)(s.id);
+        const [running] = await pool.execute(
+            `SELECT r.id FROM scrape_runs r WHERE r.status = 'running' AND r.source_id IN (${sources.map(() => '?').join(',')}) LIMIT 1`,
+            sources.map((s) => s.id)
+        );
+        if (running.length)
+            return res.status(409).json({ detail: `${sources[0].name} is already being scraped — new tenders will appear shortly` });
+        // Fire and forget — the hourly-style incremental run only fetches bids
+        // published since the last run, so it usually finishes in under a minute.
+        for (const s of sources) {
+            (0, scrapeTasks_1.scrapeSource)(s.id)
+                .then(() => console.log(`[Scrape] '${s.name}' scrape completed`))
+                .catch((err) => console.error(`[Scrape] '${s.name}' scrape failed:`, err));
+        }
+        res.json({ message: `Fetching the latest ${sources.map((s) => s.name).join(', ')} tenders` });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_1.AppError)
+            return res.status(err.statusCode).json({ detail: err.message });
+        res.status(500).json({ detail: 'Internal server error' });
+    }
+});
 // GET /:source_id - Get source detail
 router.get('/:source_id', auth_1.authenticate, async (req, res) => {
     try {

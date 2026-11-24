@@ -63,6 +63,26 @@ router.get('/', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ detail: 'Internal server error' });
     }
 });
+// GET /unread-count - For the header bell (polled every minute)
+router.get('/unread-count', auth_1.authenticate, async (req, res) => {
+    try {
+        res.json({ unread: await alertService.getUnreadCount(req.user.id) });
+    }
+    catch (err) {
+        res.status(500).json({ detail: 'Internal server error' });
+    }
+});
+// GET /today?scope=mine|all - Tenders added today (Alerts page)
+router.get('/today', auth_1.authenticate, async (req, res) => {
+    try {
+        const scope = req.query.scope === 'all' ? 'all' : 'mine';
+        res.json(await alertService.getTodaySummary(req.user.id, scope));
+    }
+    catch (err) {
+        console.error('[Alerts] today summary failed:', err.message);
+        res.status(500).json({ detail: 'Internal server error' });
+    }
+});
 // PATCH /:alert_id/read - Mark alert as read (authenticated)
 router.patch('/:alert_id/read', auth_1.authenticate, async (req, res) => {
     try {
@@ -143,8 +163,19 @@ router.patch('/settings', auth_1.authenticate, async (req, res) => {
         if (req.body.deadline_reminder_days !== undefined) {
             updateData.deadlineReminderDays = req.body.deadline_reminder_days;
         }
-        const result = await alertService.updateAlertSettings(req.user.id, updateData);
-        res.json(result);
+        if (req.body.notify_new_tenders !== undefined) updateData.notifyNewTenders = !!req.body.notify_new_tenders;
+        if (req.body.notify_deadlines !== undefined) updateData.notifyDeadlines = !!req.body.notify_deadlines;
+        if (req.body.keyword_matches_only !== undefined) updateData.keywordMatchesOnly = !!req.body.keyword_matches_only;
+        if (req.body.alert_categories !== undefined) updateData.alertCategories = req.body.alert_categories;
+        const { settings, turnedOn } = await alertService.updateAlertSettings(req.user.id, updateData);
+        // Closing-soon alerts: check right away so the user sees results immediately
+        // (also re-check when the window or filters change while switched on)
+        const filtersChanged = ['deadlineReminderDays', 'keywordMatchesOnly', 'alertCategories'].some((k) => updateData[k] !== undefined);
+        if (turnedOn.deadlines || (settings.notify_deadlines && filtersChanged)) {
+            const { checkUpcomingDeadlines } = require('../workers/alertTasks');
+            await checkUpcomingDeadlines(req.user.id).catch((e) => console.error('[Alerts] deadline check failed:', e.message));
+        }
+        res.json(settings);
     }
     catch (err) {
         if (err instanceof errorHandler_1.AppError)

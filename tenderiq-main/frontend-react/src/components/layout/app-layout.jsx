@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
+import useAlertNotifications from '@/hooks/useAlertNotifications';
 import { Link } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -73,6 +74,42 @@ export default function AppLayout({ children }) {
       }
     }
   }, []);
+
+  /* ---- Header bell: unread alert count (+ browser notifications when enabled) ---- */
+  const { unread } = useAlertNotifications((alert) =>
+    navigate(alert.tender_id ? `/tenders/${alert.tender_id}` : '/alerts'),
+  );
+
+  /* ---- Header search: Enter / search button opens Tenders filtered by the query ---- */
+  const location = useLocation();
+  const urlSearch = new URLSearchParams(location.search).get('search') || '';
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
+
+  // Phones and tablets get a shorter search placeholder (the long one gets cut off)
+  const [isPhone, setIsPhone] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const onChange = (e) => setIsPhone(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Keep the box in sync when the URL search changes (e.g. cleared on Tenders page)
+  useEffect(() => {
+    if (pathname.startsWith('/tenders')) setSearchQuery(urlSearch);
+  }, [pathname, urlSearch]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    navigate(q ? `/tenders?search=${encodeURIComponent(q)}` : '/tenders');
+  };
+
+  const handleSearchClear = () => {
+    setSearchQuery('');
+    // If a search is currently applied on the Tenders page, remove it too
+    if (pathname.startsWith('/tenders') && urlSearch) navigate('/tenders');
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('tenderiq_token');
@@ -249,7 +286,7 @@ export default function AppLayout({ children }) {
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex h-[72px] items-center gap-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur lg:px-8">
+        <header className="flex h-16 items-center gap-2 border-b border-gray-200 bg-white/95 px-3 backdrop-blur sm:h-[72px] sm:gap-4 sm:px-4 lg:px-8">
           <button
             onClick={() => setMobileSidebarOpen(true)}
             className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
@@ -259,32 +296,64 @@ export default function AppLayout({ children }) {
 
           {/* Search (full-width, primary header element) */}
           <div className="flex flex-1 items-center">
-            <div className="relative w-full max-w-2xl">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <form role="search" onSubmit={handleSearchSubmit} className="relative w-full max-w-2xl">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 sm:left-4" />
               <input
                 type="text"
-                placeholder="Search tenders, keywords or users..."
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-11 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') handleSearchClear();
+                }}
+                placeholder={isPhone ? 'Search tenders…' : 'Search tenders by title, bid number or keyword…'}
+                aria-label="Search tenders"
+                className={`w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 text-sm sm:pl-11 ${searchQuery ? 'pr-[84px]' : 'pr-12'} text-gray-900 placeholder:text-gray-400 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100`}
               />
-            </div>
+              <div className="absolute inset-y-0 right-1.5 flex items-center gap-1">
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={handleSearchClear}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700"
+                    aria-label="Clear search"
+                    title="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="flex h-8 w-9 items-center justify-center rounded-md bg-brand-700 text-white transition-colors hover:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                  aria-label="Search"
+                  title="Search (Enter)"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
             {/* Notifications */}
             <Link
               to="/alerts"
               className="relative rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-              aria-label="Notifications"
+              aria-label={unread ? `Alerts, ${unread} unread` : 'Alerts'}
+              title={unread ? `${unread} unread alert${unread === 1 ? '' : 's'}` : 'Alerts'}
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+              {unread > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
             </Link>
 
             {/* Help */}
             <button
               type="button"
               aria-label="Help"
-              className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+              className="hidden rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 sm:inline-flex"
             >
               <HelpCircle className="h-5 w-5" />
             </button>
@@ -306,7 +375,7 @@ export default function AppLayout({ children }) {
                     {user?.role === 'admin' ? 'Procurement Lead' : (user?.role || 'Member')}
                   </p>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900 font-serif text-sm font-semibold text-gold-300 ring-2 ring-gold-500/40">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-900 font-serif sm:h-10 sm:w-10 text-sm font-semibold text-gold-300 ring-2 ring-gold-500/40">
                   {initials}
                 </div>
               </button>

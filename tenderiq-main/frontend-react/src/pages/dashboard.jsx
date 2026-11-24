@@ -19,7 +19,9 @@ import {
   TrendingUp,
   Eye,
   KeyRound,
+  Landmark,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import {
   BarChart,
   Bar,
@@ -78,6 +80,7 @@ export default function DashboardPage() {
   const [recentTenders, setRecentTenders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scraping, setScraping] = useState(false);
+  const [scrapingGem, setScrapingGem] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchDashboard = useCallback(async () => {
@@ -111,6 +114,24 @@ export default function DashboardPage() {
       // error handled silently, toast would show via interceptor
     } finally {
       setScraping(false);
+    }
+  };
+
+  // Fetch only the newest GeM bids (since the last run) — usually done in under a minute
+  const handleGemNow = async () => {
+    try {
+      setScrapingGem(true);
+      const res = await api.post('/sources/scrape-type/gem');
+      toast.success(res.data?.message || 'Fetching the latest GeM tenders');
+      // Give the background scrape a head start, then refresh the numbers
+      setTimeout(() => fetchDashboard(), 30000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not start the GeM scrape';
+      // "Already running" isn't a failure — show it as a neutral notice
+      if (/already being scraped/i.test(message)) toast(message, { icon: '⏳' });
+      else toast.error(message);
+    } finally {
+      setScrapingGem(false);
     }
   };
 
@@ -231,11 +252,28 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <Button onClick={fetchDashboard} variant="outline" size="md">
+          <Button onClick={fetchDashboard} variant="outline" size="md" title="Reload the numbers on this page (does not fetch new tenders)">
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
-          <Button onClick={handleScrapeNow} loading={scraping} variant="primary" size="md">
+          <Button
+            onClick={handleGemNow}
+            loading={scrapingGem}
+            variant="outline"
+            size="md"
+            className="border-gold-500/60 text-brand-800 hover:border-gold-500 hover:bg-gold-100/60"
+            title="Fetch the newest tenders from GeM (Government e-Marketplace) only"
+          >
+            <Landmark className="h-4 w-4 text-gold-600" />
+            GeM Now
+          </Button>
+          <Button
+            onClick={handleScrapeNow}
+            loading={scraping}
+            variant="primary"
+            size="md"
+            title="Fetch new tenders from all sources: GeM, eTenders, CPPP and IREPS"
+          >
             <Rocket className="h-4 w-4" />
             Scrape Now
           </Button>

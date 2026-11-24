@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.startScheduler = startScheduler;
 const cron = require("node-cron");
 const { scrapeAllSources, cleanupOldRuns } = require("./scrapeTasks");
-const { checkUpcomingDeadlines } = require("./alertTasks");
+const { checkUpcomingDeadlines, generateNewTenderAlerts } = require("./alertTasks");
 const { extractAllPending } = require("./extractionTasks");
 
 function startScheduler() {
@@ -18,6 +18,16 @@ function startScheduler() {
         }
         catch (err) {
             console.error('[Scheduler] Hourly scrape failed:', err);
+        }
+    });
+
+    // New-tender alerts for users who switched them on (Alerts page)
+    cron.schedule('*/15 * * * *', async () => {
+        try {
+            await generateNewTenderAlerts();
+        }
+        catch (err) {
+            console.error('[Scheduler] New-tender alerts failed:', err);
         }
     });
 
@@ -54,5 +64,5 @@ function startScheduler() {
         }
     });
 
-    console.log('Scheduler started with tasks: scrape (every 1h), deadlines (daily 8am), extraction (30m), cleanup (weekly)');
+    console.log('Scheduler started with tasks: scrape (every 1h), new-tender alerts (15m), deadlines (daily 8am), extraction (30m), cleanup (weekly)');
 }

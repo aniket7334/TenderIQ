@@ -204,8 +204,10 @@ router.post('/:tender_id/comments', auth_1.authenticate, async (req, res) => {
 router.get('/:tender_id/documents', auth_1.authenticate, async (req, res) => {
     try {
         const tenderId = req.params.tender_id;
-        const documents = await tenderService.listDocuments(tenderId);
-        res.json(documents);
+        // Fetches GeM's bid document on first view (cached; ?refresh=1 re-fetches)
+        const { getDocumentsBundle } = require('../services/tenderDocuments.service');
+        const bundle = await getDocumentsBundle(tenderId, { refresh: req.query.refresh === '1' });
+        res.json(bundle);
     }
     catch (err) {
         if (err instanceof errorHandler_1.AppError)

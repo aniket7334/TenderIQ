@@ -234,6 +234,21 @@ const migrations = [
 // Indexes added after the first release (the tables already exist, so they
 // can't go in CREATE TABLE). "Duplicate key name" is ignored on re-runs.
 const indexes = [
+  // Notification settings (Alerts page). Off until the user turns them on.
+  'ALTER TABLE user_preferences ADD COLUMN notify_new_tenders BOOLEAN NOT NULL DEFAULT FALSE',
+  'ALTER TABLE user_preferences ADD COLUMN notify_deadlines BOOLEAN NOT NULL DEFAULT FALSE',
+  'ALTER TABLE user_preferences ADD COLUMN keyword_matches_only BOOLEAN NOT NULL DEFAULT TRUE',
+  'ALTER TABLE user_preferences ADD COLUMN alert_categories JSON NULL',
+  // New-tender alerts cover tenders added after this moment (set when switched on)
+  'ALTER TABLE user_preferences ADD COLUMN last_alert_check_at DATETIME NULL',
+  'CREATE INDEX idx_alerts_user_read ON alerts (user_id, is_read, created_at)',
+  // Documents tab: details parsed from the source bid document (required
+  // documents, EMD, ePBG, contract period…) and when they were fetched.
+  'ALTER TABLE tenders ADD COLUMN doc_details JSON NULL',
+  'ALTER TABLE tenders ADD COLUMN docs_fetched_at DATETIME NULL',
+  // Heartbeat for long scrapes: a "running" run whose heartbeat stops (process
+  // restarted/killed) is closed as interrupted instead of blocking new scrapes.
+  'ALTER TABLE scrape_runs ADD COLUMN heartbeat_at DATETIME NULL',
   // Sortable copy of the title: TEXT columns can't use an index for ORDER BY,
   // so keep the first 191 chars in an indexed, auto-maintained column.
   "ALTER TABLE tenders ADD COLUMN title_sort VARCHAR(191) GENERATED ALWAYS AS (LEFT(title, 191)) STORED, ADD INDEX idx_tenders_title_sort (title_sort)",
@@ -259,8 +274,8 @@ async function migrate() {
       console.log(' OK');
     }
     for (const sql of indexes) {
-      const name = sql.match(/INDEX (\w+)/)[1];
-      process.stdout.write(`  Adding index ${name}...`);
+      const name = (sql.match(/INDEX (\w+)/) || sql.match(/COLUMN (\w+)/))[1];
+      process.stdout.write(`  Adding ${name}...`);
       try {
         await conn.execute(sql);
         console.log(' OK');

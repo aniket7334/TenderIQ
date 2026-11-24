@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Globe,
@@ -19,6 +19,12 @@ const adminNavItems = [
 
 export default function AdminLayout({ children }) {
   const pathname = useLocation().pathname;
+  const activeRef = useRef(null);
+
+  // On narrow screens the tab bar scrolls sideways — keep the current tab in view
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [pathname]);
 
   return (
     <div className="space-y-6">
@@ -28,20 +34,21 @@ export default function AdminLayout({ children }) {
           <Settings className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Administration</h1>
-          <p className="text-sm text-gray-500">Manage sources, keywords, users, and system settings</p>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Administration</h1>
+          <p className="text-xs text-gray-500 sm:text-sm">Manage sources, keywords, users, and system settings</p>
         </div>
       </div>
 
       {/* Admin sub-nav */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-6 overflow-x-auto">
+        <nav className="scrollbar-none -mb-px flex space-x-6 overflow-x-auto">
           {adminNavItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 to={item.href}
+                ref={isActive ? activeRef : undefined}
                 className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                   isActive
                     ? 'border-blue-600 text-blue-600'

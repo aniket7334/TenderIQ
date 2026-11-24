@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
+import DocumentsPanel from '@/components/tender/documents-panel';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
 
 export default function TenderDetailPage() {
@@ -38,6 +39,9 @@ export default function TenderDetailPage() {
 
   const [tender, setTender] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [docBundle, setDocBundle] = useState(null);
+  const [docsLoading, setDocsLoading] = useState(true);
+  const [docsRefreshing, setDocsRefreshing] = useState(false);
   const [notes, setNotes] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [comments, setComments] = useState([]);
@@ -61,9 +65,8 @@ export default function TenderDetailPage() {
     try {
       setLoading(true);
       setError(null);
-      const [tenderRes, docsRes, notesRes, logsRes, commentsRes, usersRes] = await Promise.allSettled([
+      const [tenderRes, notesRes, logsRes, commentsRes, usersRes] = await Promise.allSettled([
         api.get(`/tenders/${id}`),
-        api.get(`/tenders/${id}/documents`),
         api.get(`/tenders/${id}/notes`),
         api.get(`/audit-logs`, { params: { entity_type: 'tender', entity_id: id, page_size: 50 } }),
         api.get(`/tenders/${id}/comments`),
@@ -73,7 +76,6 @@ export default function TenderDetailPage() {
       if (tenderRes.status === 'fulfilled') setTender(tenderRes.value.data);
       else throw new Error('Failed to load tender');
 
-      if (docsRes.status === 'fulfilled') setDocuments(docsRes.value.data.items || docsRes.value.data || []);
       if (notesRes.status === 'fulfilled') setNotes(notesRes.value.data.items || notesRes.value.data || []);
       if (logsRes.status === 'fulfilled') setAuditLogs(logsRes.value.data.items || logsRes.value.data || []);
       if (commentsRes.status === 'fulfilled') setComments(commentsRes.value.data.items || commentsRes.value.data || []);
@@ -86,9 +88,32 @@ export default function TenderDetailPage() {
     }
   }, [id]);
 
+  // Documents load separately: the first view fetches the bid document from
+  // the source portal (about a second), so it shouldn't hold up the page.
+  const fetchDocuments = useCallback(
+    async (refresh = false) => {
+      try {
+        refresh ? setDocsRefreshing(true) : setDocsLoading(true);
+        const res = await api.get(`/tenders/${id}/documents`, { params: refresh ? { refresh: 1 } : {} });
+        const data = res.data || {};
+        setDocBundle(data);
+        setDocuments(data.items || (Array.isArray(data) ? data : []));
+      } catch (err) {
+        setDocBundle((prev) => ({ ...(prev || {}), fetch_error: err instanceof Error ? err.message : 'Could not load documents' }));
+      } finally {
+        setDocsLoading(false);
+        setDocsRefreshing(false);
+      }
+    },
+    [id],
+  );
+
   useEffect(() => {
-    if (id) fetchTender();
-  }, [id, fetchTender]);
+    if (id) {
+      fetchTender();
+      fetchDocuments();
+    }
+  }, [id, fetchTender, fetchDocuments]);
 
   const handleShortlist = async () => {
     if (!tender) return;
@@ -362,10 +387,12 @@ export default function TenderDetailPage() {
       </Button>
 
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      {/* Title and actions sit side by side only on wide screens; on phones, laptops and
+          tablets the buttons wrap below the title so it keeps the full width (xl = 1280px+) */}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-sm text-gray-500">{tender.reference_number}</span>
+            <span className="break-all font-mono text-sm text-gray-500">{tender.reference_number}</span>
             <span
               className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${getStatusColor(tender.internal_status || tender.status)}`}
             >
@@ -385,10 +412,10 @@ export default function TenderDetailPage() {
               </Badge>
             )}
           </div>
-          <h1 className="mt-2 text-xl font-bold text-gray-900 sm:text-2xl">{tender.title}</h1>
+          <h1 className="mt-2 break-words text-xl font-bold text-gray-900 sm:text-2xl">{tender.title}</h1>
           <p className="mt-1 text-sm text-gray-500">{tender.organization}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 xl:max-w-[52%] xl:flex-shrink-0 xl:justify-end">
           <Button
             onClick={handleShortlist}
             variant={tender.internal_status === 'interested' ? 'primary' : 'outline'}
@@ -575,45 +602,12 @@ export default function TenderDetailPage() {
           )}
 
           {activeTab === 'documents' && (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-              {documents.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <FileText className="mb-3 h-10 w-10 text-gray-300" />
-                  <p className="text-sm font-medium text-gray-600">No documents attached</p>
-                  <p className="mt-1 text-sm text-gray-400">
-                    Documents will appear here when uploaded
-                  </p>
-                </div>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {documents.map((doc) => (
-                    <li key={doc.id} className="flex items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <FileText className="h-5 w-5 flex-shrink-0 text-gray-400" />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-gray-900">
-                            {doc.file_name}
-                          </p>
-                          <p className="truncate text-xs text-gray-500">
-                            {doc.document_type} &middot;{' '}
-                            {(doc.file_size / 1024).toFixed(1)} KB &middot;{' '}
-                            Uploaded by {doc.uploaded_by_name} on {formatDate(doc.created_at)}
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href={doc.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <DocumentsPanel
+              bundle={docBundle}
+              loading={docsLoading}
+              refreshing={docsRefreshing}
+              onRefresh={() => fetchDocuments(true)}
+            />
           )}
 
           {activeTab === 'notes' && (

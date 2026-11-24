@@ -183,6 +183,13 @@ function TendersPageContent() {
     sort_order: searchParams.get('sort_order') || 'desc',
   });
 
+  // The header search bar navigates to /tenders?search=…; apply it whenever it
+  // changes, even when this page is already open.
+  const urlSearch = searchParams.get('search') || '';
+  useEffect(() => {
+    setFilters((prev) => (prev.search === urlSearch ? prev : { ...prev, search: urlSearch, page: 1 }));
+  }, [urlSearch]);
+
   const fetchTenders = useCallback(async () => {
     try {
       setLoading(true);
@@ -286,6 +293,8 @@ function TendersPageContent() {
       sort_by: 'created_at',
       sort_order: 'desc',
     });
+    // Also drop ?search= so the header search box clears
+    if (urlSearch) navigate('/tenders', { replace: true });
   };
 
   const SortIcon = ({ column }) => {
@@ -467,9 +476,10 @@ function TendersPageContent() {
         </div>
       )}
 
-      {/* Region / Sector / Contract Value filter card */}
-      <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-5 shadow-sm">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
+      {/* Region / Sector / Contract Value filter card — on phones it stays folded
+          until "Advanced Filters" is tapped, so the tender list is visible first */}
+      <div className={`${showFilters ? 'block' : 'hidden'} rounded-xl border border-gray-200 bg-gray-50/60 p-4 shadow-sm sm:p-5 md:block`}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end lg:grid-cols-[1fr_1fr_1fr_auto]">
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
               Region
@@ -797,7 +807,7 @@ function TendersPageContent() {
         ) : (
           <>
             {/* Desktop only: table (lg and up) */}
-            <div className="hidden lg:block overflow-x-auto">
+            <div className="hidden xl:block overflow-x-auto">
               <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
@@ -968,7 +978,7 @@ function TendersPageContent() {
             </div>
 
             {/* Mobile + tablet: stacked cards (below lg) */}
-            <ul className="lg:hidden divide-y divide-gray-100">
+            <ul className="xl:hidden divide-y divide-gray-100">
               {tenders.map((tender) => {
                 const cats = (tender.categories || [tender.category]).filter(Boolean).slice(0, 2);
                 return (

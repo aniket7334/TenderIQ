@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.scrapeSource = scrapeSource;
 exports.scrapeAllSources = scrapeAllSources;
 exports.cleanupOldRuns = cleanupOldRuns;
+exports.closeStaleRuns = closeStaleRuns;
 const { pool } = require('../db');
 const { v4: uuidv4 } = require('uuid');
 const { getAdapter } = require("../scrapers/adapters");
@@ -46,6 +47,20 @@ function estimateCost({ directCost, textCost, emdAmount, tenderFee }) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * A run stays "running" forever if its process is restarted or killed
+ * mid-scrape. Live runs refresh heartbeat_at on every page, so any run whose
+ * heartbeat is older than 10 minutes is closed as interrupted.
+ */
+async function closeStaleRuns(sourceId) {
+    await pool.execute(
+        `UPDATE scrape_runs SET status = 'failed', error_log = 'Interrupted (process stopped or restarted)', completed_at = NOW()
+          WHERE status = 'running' AND COALESCE(heartbeat_at, started_at) < NOW() - INTERVAL 10 MINUTE
+          ${sourceId ? 'AND source_id = ?' : ''}`,
+        sourceId ? [sourceId] : []
+    );
+}
+
+/**
  * Scrape one source.
  * opts.full     — ignore the "stop at bids older than the last run" shortcut
  *                 (used for the first full GeM import).
@@ -59,11 +74,8 @@ async function scrapeSource(sourceId, opts = {}) {
     const source = sourceRows[0];
     if (!source || !source.is_active) return;
 
-    // Runs left "running" by a crashed/stopped process never finish — close them out.
-    await pool.execute(
-        "UPDATE scrape_runs SET status = 'failed', error_log = 'Interrupted (process stopped)', completed_at = NOW() WHERE source_id = ? AND status = 'running' AND started_at < NOW() - INTERVAL 3 HOUR",
-        [sourceId]
-    );
+    // Runs left "running" by a crashed/restarted process never finish — close them out.
+    await closeStaleRuns(sourceId);
     // Don't start a second scrape of the same source while one is still running
     // (e.g. the long first GeM import and the hourly scheduler).
     const [active] = await pool.execute(
@@ -77,7 +89,7 @@ async function scrapeSource(sourceId, opts = {}) {
 
     const runId = uuidv4();
     await pool.execute(
-        'INSERT INTO scrape_runs (id, source_id, status, started_at) VALUES (?, ?, ?, NOW())',
+        'INSERT INTO scrape_runs (id, source_id, status, started_at, heartbeat_at) VALUES (?, ?, ?, NOW(), NOW())',
         [runId, sourceId, 'running']
     );
 
@@ -211,6 +223,8 @@ async function scrapeSource(sourceId, opts = {}) {
                 tendersNew++;
             }
 
+            // Heartbeat every page so a stalled run can be detected
+            await pool.execute('UPDATE scrape_runs SET heartbeat_at = NOW() WHERE id = ?', [runId]);
             // Long crawls: keep the run's counters current so progress is visible
             if (page % 20 === 0) {
                 await pool.execute('UPDATE scrape_runs SET tenders_found = ?, tenders_new = ? WHERE id = ?', [tendersFound, tendersNew, runId]);
