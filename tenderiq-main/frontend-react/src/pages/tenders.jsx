@@ -16,11 +16,12 @@ import {
   SlidersHorizontal,
   Columns3,
   Plus,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
-import { ALL_COUNTRIES, INTERNATIONAL_REGIONS } from '@/lib/countries';
+import { ALL_COUNTRIES, INTERNATIONAL_REGIONS, EUROPE, EUROPE_COUNTRY_NAMES, isEuropeRegion } from '@/lib/countries';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useLiveTenders } from '@/hooks/useLiveTenders';
@@ -172,6 +173,11 @@ function TendersPageContent() {
 
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedCountry, setSelectedCountry] = useState(searchParams.get('country') || '');
+  // Europe regions are loaded live from TED (not stored); they can also filter by city
+  const europeMode = isEuropeRegion(selectedCountry);
+  const [selectedCity, setSelectedCity] = useState(searchParams.get('city') || '');
+  const [cityInput, setCityInput] = useState(searchParams.get('city') || '');
+  const [liveInfo, setLiveInfo] = useState(null);
   const [density, setDensity] = useState('compact');
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
@@ -209,6 +215,7 @@ function TendersPageContent() {
       if (filters.max_value) params.max_value = filters.max_value;
       if (selectedCategory) params.category = selectedCategory;
       if (selectedCountry) params.country = selectedCountry;
+      if (europeMode && selectedCity) params.city = selectedCity;
       params.page = filters.page || 1;
       params.page_size = filters.page_size || 20;
       if (filters.sort_by) params.sort_by = filters.sort_by;
@@ -218,6 +225,7 @@ function TendersPageContent() {
 
       const res = await api.get('/tenders', { params });
       setTenders(res.data.items);
+      setLiveInfo(res.data.live_source ? { source: res.data.live_source, defaultSectors: res.data.default_sectors } : null);
       setTotal(res.data.total);
       setTotalPages(res.data.total_pages);
     } catch (err) {
@@ -226,7 +234,7 @@ function TendersPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [filters, selectedCategory, selectedCountry]);
+  }, [filters, selectedCategory, selectedCountry, selectedCity, europeMode]);
 
   const fetchSources = useCallback(async () => {
     try {
@@ -253,6 +261,7 @@ function TendersPageContent() {
 
   // Live: new GeM tenders show up in the list by themselves
   const { sync } = useLiveTenders((count) => {
+    if (europeMode) return; // new GeM tenders don't change the live TED view
     fetchTenders(true);
     fetchFacets();
     toast.success(`${count.toLocaleString()} new tender${count === 1 ? '' : 's'} added`, { id: 'live-new' });
@@ -296,6 +305,8 @@ function TendersPageContent() {
   const clearFilters = () => {
     setSelectedCategory('');
     setSelectedCountry('');
+    setSelectedCity('');
+    setCityInput('');
     setFilters({
       search: '',
       status: '',
@@ -506,6 +517,8 @@ function TendersPageContent() {
               value={selectedCountry}
               onChange={(e) => {
                 setSelectedCountry(e.target.value);
+                setSelectedCity('');
+                setCityInput('');
                 setFilters((prev) => ({ ...prev, page: 1 }));
               }}
               className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -528,6 +541,17 @@ function TendersPageContent() {
                   })}
                 </optgroup>
               )}
+              <optgroup label="Europe — live from TED">
+                <option value={EUROPE}>🇪🇺 All Europe</option>
+                {EUROPE_COUNTRY_NAMES.map((name) => {
+                  const opt = ALL_COUNTRIES.find((c) => c.value === name);
+                  return (
+                    <option key={`eu-${name}`} value={name}>
+                      {opt?.flag} {name}
+                    </option>
+                  );
+                })}
+              </optgroup>
               <optgroup label="International">
                 {INTERNATIONAL_REGIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -536,7 +560,7 @@ function TendersPageContent() {
                 ))}
               </optgroup>
               <optgroup label="All countries">
-                {ALL_COUNTRIES.filter((c) => !regionFacets.some((r) => r.country === c.value)).map((opt) => (
+                {ALL_COUNTRIES.filter((c) => !regionFacets.some((r) => r.country === c.value) && !EUROPE_COUNTRY_NAMES.includes(c.value)).map((opt) => (
                   <option key={opt.code} value={opt.value}>
                     {opt.flag} {opt.label}
                   </option>
@@ -557,14 +581,14 @@ function TendersPageContent() {
               className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="">
-                All Categories
-                {sectorFacets.length > 0 &&
+                {europeMode ? 'Marine, dredging & pipelines' : 'All Categories'}
+                {!europeMode && sectorFacets.length > 0 &&
                   ` (${sectorFacets.reduce((s, x) => s + x.count, 0)})`}
               </option>
               {sectorFacets.length > 0
                 ? sectorFacets.map((s) => (
                     <option key={s.sector} value={s.sector}>
-                      {s.sector} ({s.count})
+                      {s.sector}{europeMode ? '' : ` (${s.count})`}
                     </option>
                   ))
                 : CATEGORY_OPTIONS.slice(1).map((cat) => (
@@ -574,6 +598,30 @@ function TendersPageContent() {
                   ))}
             </select>
           </div>
+          {europeMode ? (
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              City
+            </label>
+            <Input
+              placeholder="e.g. Rotterdam, Hamburg"
+              value={cityInput}
+              onChange={(e) => setCityInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setSelectedCity(cityInput.trim());
+                  setFilters((prev) => ({ ...prev, page: 1 }));
+                }
+              }}
+              onBlur={() => {
+                if (cityInput.trim() !== selectedCity) {
+                  setSelectedCity(cityInput.trim());
+                  setFilters((prev) => ({ ...prev, page: 1 }));
+                }
+              }}
+            />
+          </div>
+          ) : (
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
               Contract Value
@@ -606,6 +654,7 @@ function TendersPageContent() {
               />
             </div>
           </div>
+          )}
           <div className="flex items-end gap-2">
             {hasActiveFilters && (
               <Button variant="outline" size="md" onClick={clearFilters}>
@@ -619,6 +668,18 @@ function TendersPageContent() {
           </div>
         </div>
       </div>
+
+      {europeMode && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+          <Globe className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
+          <p>
+            <span className="font-medium text-gray-900">Live from TED</span>, the EU's official tender journal — open
+            calls for tender only, nothing is stored.{' '}
+            {(!selectedCategory) && 'Showing dredging, marine, pipeline & shipping tenders — pick a Sector to see others. '}
+            Open a tender for its documents and how to apply.
+          </p>
+        </div>
+      )}
 
       {/* Hidden legacy category chips kept for SEO/bookmarks but not displayed */}
       <div className="hidden">
@@ -878,7 +939,9 @@ function TendersPageContent() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {tenders.map((tender) => {
-                    const badge = statusBadge(tender.internal_status || tender.status);
+                    const badge = tender.is_live
+                      ? { label: 'Live', cls: 'bg-gray-50 text-gray-600 ring-gray-200' }
+                      : statusBadge(tender.internal_status || tender.status);
                     return (
                       <tr
                         key={tender.id}
@@ -931,7 +994,7 @@ function TendersPageContent() {
                             return (
                               <span className="inline-flex items-center gap-1.5 text-sm text-gray-700">
                                 <span aria-hidden>{opt?.flag || '📍'}</span>
-                                <span className="truncate">{country}</span>
+                                <span className="truncate">{tender.city ? `${tender.city}, ` : ''}{country}</span>
                               </span>
                             );
                           })()}
@@ -952,19 +1015,23 @@ function TendersPageContent() {
                             : <span className="text-gray-300">-</span>}
                         </td>
                         <td className={`px-4 ${rowPad}`}>
+                          {tender.is_live ? (
+                            <span className="text-xs text-gray-400">Live · {tender.source_name}</span>
+                          ) : (
                           <Link
                             to={`/tenders/${tender.id}#notes`}
                             className="block truncate text-sm italic text-gray-400 hover:text-gray-600 hover:not-italic"
                           >
                             Click to add note...
                           </Link>
+                          )}
                         </td>
                         <td className={`px-4 ${rowPad}`}>
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={(e) => handleShortlist(tender.id, e)}
                               title={tender.internal_status === 'interested' ? 'Remove from shortlist' : 'Shortlist tender'}
-                              className={`rounded-lg p-1.5 transition-colors ${
+                              className={`${tender.is_live ? 'hidden ' : ''}rounded-lg p-1.5 transition-colors ${
                                 tender.internal_status === 'interested'
                                   ? 'text-amber-500 hover:bg-amber-50'
                                   : 'text-gray-400 hover:bg-amber-50 hover:text-amber-500'
@@ -1010,9 +1077,9 @@ function TendersPageContent() {
                         {tender.title}
                       </p>
                       <span
-                        className={`flex-shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getStatusColor(tender.internal_status || tender.status)}`}
+                        className={`flex-shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${tender.is_live ? 'border-gray-200 text-gray-600' : getStatusColor(tender.internal_status || tender.status)}`}
                       >
-                        {getStatusLabel(tender.internal_status || tender.status)}
+                        {tender.is_live ? 'Live' : getStatusLabel(tender.internal_status || tender.status)}
                       </span>
                     </div>
                     <p className="mt-1 truncate font-mono text-xs text-gray-400">
@@ -1020,6 +1087,9 @@ function TendersPageContent() {
                     </p>
                     {tender.organization && (
                       <p className="mt-1 truncate text-xs text-gray-600">{tender.organization}</p>
+                    )}
+                    {tender.is_live && tender.location && (
+                      <p className="mt-0.5 truncate text-xs text-gray-500">{tender.location}</p>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                       {tender.estimated_value && (
@@ -1058,7 +1128,7 @@ function TendersPageContent() {
                       <button
                         onClick={(e) => handleShortlist(tender.id, e)}
                         title={tender.internal_status === 'interested' ? 'Remove from shortlist' : 'Shortlist tender'}
-                        className={`rounded-lg p-2 ${
+                        className={`${tender.is_live ? 'hidden ' : ''}rounded-lg p-2 ${
                           tender.internal_status === 'interested'
                             ? 'text-amber-500 hover:bg-amber-50'
                             : 'text-gray-500 hover:bg-amber-50 hover:text-amber-500'

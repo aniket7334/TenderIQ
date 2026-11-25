@@ -132,7 +132,9 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
             {d.bid_number && <span className="ml-2 font-mono text-xs font-normal text-gray-500">{d.bid_number}</span>}
           </p>
           <p className="text-xs text-gray-500">
-            {bundle?.fetched_at
+            {source.live
+              ? 'Shown live from the official notice — nothing is stored'
+              : bundle?.fetched_at
               ? `Fetched ${formatDate(bundle.fetched_at)}`
               : source.can_fetch
                 ? 'Not fetched yet'
@@ -167,6 +169,8 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
         </div>
       )}
 
+      {/* GeM-only: checklist + bid terms parsed from the bid PDF */}
+      {!source.live && (
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
         {/* Required documents checklist */}
         <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -214,6 +218,14 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
           )}
         </section>
       </div>
+      )}
+
+      {source.live && bundle?.note && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+          <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
+          {bundle.note.text}
+        </div>
+      )}
 
       {/* Files */}
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">

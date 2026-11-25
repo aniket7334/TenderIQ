@@ -40,8 +40,36 @@ const tenderService = __importStar(require("../services/tender.service"));
 const auditService = __importStar(require("../services/audit.service"));
 const errorHandler_1 = require("../middleware/errorHandler");
 const router = (0, express_1.Router)();
+// Europe tenders are shown live from TED (src/sources/ted.js) and never stored.
+const ted = require('../sources/ted');
+const sendError = (res, err) => (err instanceof errorHandler_1.AppError
+    ? res.status(err.statusCode).json({ detail: err.message })
+    : res.status(500).json({ detail: 'Internal server error' }));
+// Live (TED) tenders can't be shortlisted, tagged, commented or edited — that needs storage
+router.use((req, res, next) => {
+    if (req.method !== 'GET' && req.path.startsWith('/ted-'))
+        return res.status(400).json({ detail: 'Europe tenders are shown live from TED and are not stored, so they cannot be shortlisted or edited.' });
+    next();
+});
 // GET / - List tenders
 router.get('/', auth_1.authenticate, async (req, res) => {
+    // Region "Europe" or a European country → live from TED, nothing stored
+    if (ted.isEuropeRegion(req.query.country)) {
+        try {
+            return res.json(await ted.searchTenders({
+                region: req.query.country,
+                city: req.query.city,
+                category: req.query.category,
+                search: req.query.search,
+                page: req.query.page,
+                pageSize: req.query.page_size,
+                sortBy: req.query.sort_by,
+            }));
+        }
+        catch (err) {
+            return sendError(res, err);
+        }
+    }
     try {
         const { search, status, internal_status, source_id, location, country, category, min_value, max_value, date_from, date_to, is_shortlisted, page, page_size, sort_by, sort_order, priority_first, } = req.query;
         const result = await tenderService.listTenders({
@@ -122,6 +150,14 @@ router.get('/facets', auth_1.authenticate, async (_req, res) => {
     }
 });
 router.get('/:tender_id', auth_1.authenticate, async (req, res) => {
+    if (ted.isLiveId(req.params.tender_id)) {
+        try {
+            return res.json(await ted.getTender(req.params.tender_id));
+        }
+        catch (err) {
+            return sendError(res, err);
+        }
+    }
     try {
         const tenderId = req.params.tender_id;
         const tender = await tenderService.getTender(tenderId);
@@ -227,6 +263,14 @@ router.post('/:tender_id/comments', auth_1.authenticate, async (req, res) => {
 });
 // GET /:tender_id/documents - List documents
 router.get('/:tender_id/documents', auth_1.authenticate, async (req, res) => {
+    if (ted.isLiveId(req.params.tender_id)) {
+        try {
+            return res.json(await ted.getDocuments(req.params.tender_id));
+        }
+        catch (err) {
+            return sendError(res, err);
+        }
+    }
     try {
         const tenderId = req.params.tender_id;
         // Fetches GeM's bid document on first view (cached; ?refresh=1 re-fetches)
@@ -242,6 +286,7 @@ router.get('/:tender_id/documents', auth_1.authenticate, async (req, res) => {
 });
 // GET /:tender_id/history - Get audit trail
 router.get('/:tender_id/history', auth_1.authenticate, async (req, res) => {
+    if (ted.isLiveId(req.params.tender_id)) return res.json([]);
     try {
         const tenderId = req.params.tender_id;
         const history = await tenderService.getTenderHistory(tenderId);

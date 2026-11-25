@@ -24,12 +24,14 @@ import {
   Tag,
   User as UserIcon,
   Clock,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
 import DocumentsPanel from '@/components/tender/documents-panel';
+import HowToApply from '@/components/tender/how-to-apply';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
 
 export default function TenderDetailPage() {
@@ -363,14 +365,46 @@ export default function TenderDetailPage() {
     );
   }
 
-  const tabs = [
+  // Live tenders (Europe, from TED) aren't stored: no notes/history/shortlist
+  const isLive = !!tender.is_live;
+  const money = (v, cur) => {
+    try {
+      return new Intl.NumberFormat('en-GB', { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(v);
+    } catch {
+      return `${Number(v).toLocaleString()} ${cur || ''}`;
+    }
+  };
+  const liveTabs = [
+    { key: 'overview', label: 'Overview', icon: Eye },
+    { key: 'documents', label: 'Documents', icon: FileText },
+    { key: 'apply', label: 'How to apply', icon: Send },
+  ];
+  const liveFields = [
+    { label: 'Name of Work', value: tender.title },
+    { label: 'TED Notice Number', value: tender.reference_number },
+    { label: 'Buyer', value: tender.organization, icon: Building2 },
+    { label: 'Location', value: tender.location, icon: MapPin },
+    { label: 'Category', value: (tender.categories || []).join(', ') || null },
+    { label: 'Contract Type', value: tender.tender_type },
+    { label: 'Procedure', value: tender.procedure },
+    { label: 'Estimated Value', value: tender.estimated_value ? money(tender.estimated_value, tender.currency) : null },
+    { label: 'Published Date', value: formatDate(tender.published_date), icon: Calendar },
+    { label: 'Submission Deadline', value: formatDate(tender.submission_deadline), icon: Clock },
+    { label: 'CPV Codes', value: (tender.cpv_codes || []).join(', ') || null },
+    { label: 'Source', value: 'TED — Tenders Electronic Daily (EU), shown live' },
+    { label: 'Source URL', value: tender.source_url },
+    { label: 'Description', value: tender.description },
+  ];
+
+  const storedTabs = [
     { key: 'overview', label: 'Overview', icon: Eye },
     { key: 'documents', label: `Documents (${documents.length})`, icon: FileText },
     { key: 'notes', label: `Notes (${notes.length})`, icon: MessageSquare },
     { key: 'history', label: 'History', icon: History },
   ];
+  const tabs = isLive ? liveTabs : storedTabs;
 
-  const detailFields = [
+  const storedFields = [
     { label: 'Name of Work', value: tender.title },
     { label: 'Reference Number', value: tender.reference_number },
     { label: 'Client / Organization', value: tender.organization, icon: Building2 },
@@ -393,6 +427,7 @@ export default function TenderDetailPage() {
     { label: 'Priority', value: tender.priority },
     { label: 'Description', value: tender.description },
   ];
+  const detailFields = isLive ? liveFields : storedFields;
 
   return (
     <div className="space-y-6">
@@ -409,12 +444,18 @@ export default function TenderDetailPage() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="break-all font-mono text-sm text-gray-500">{tender.reference_number}</span>
+            {isLive ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+                <Globe className="h-3 w-3" /> Live · TED (EU)
+              </span>
+            ) : (
             <span
               className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${getStatusColor(tender.internal_status || tender.status)}`}
             >
               {getStatusLabel(tender.internal_status || tender.status)}
             </span>
-            {tender.priority && tender.priority !== 'low' && (
+            )}
+            {!isLive && tender.priority && tender.priority !== 'low' && (
               <Badge
                 variant={
                   tender.priority === 'critical'
@@ -429,9 +470,10 @@ export default function TenderDetailPage() {
             )}
           </div>
           <h1 className="mt-2 break-words text-xl font-bold text-gray-900 sm:text-2xl">{tender.title}</h1>
-          <p className="mt-1 text-sm text-gray-500">{tender.organization}</p>
+          <p className="mt-1 text-sm text-gray-500">{[tender.organization, isLive && tender.location].filter(Boolean).join(' · ')}</p>
         </div>
         <div className="flex flex-wrap gap-2 xl:max-w-[52%] xl:flex-shrink-0 xl:justify-end">
+          {!isLive && (
           <Button
             onClick={handleShortlist}
             variant={tender.internal_status === 'interested' ? 'primary' : 'outline'}
@@ -445,10 +487,13 @@ export default function TenderDetailPage() {
               {tender.internal_status === 'interested' ? 'Shortlisted' : 'Shortlist'}
             </span>
           </Button>
+          )}
           <Button onClick={handleDownloadTender} variant="outline" size="sm">
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Download</span>
           </Button>
+          {!isLive && (
+          <>
           <Button
             onClick={handleFetchFromSource}
             variant="outline"
@@ -469,6 +514,8 @@ export default function TenderDetailPage() {
             <Sparkles className="h-4 w-4" />
             <span className="hidden sm:inline">Infographic</span>
           </Button>
+          </>
+          )}
           {tender.source_url && (
             <a
               href={tender.source_url}
@@ -477,7 +524,7 @@ export default function TenderDetailPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               <ExternalLink className="h-4 w-4" />
-              <span className="hidden sm:inline">Source</span>
+              <span className="hidden sm:inline">{isLive ? 'View on TED' : 'Source'}</span>
             </a>
           )}
         </div>
@@ -626,6 +673,8 @@ export default function TenderDetailPage() {
             />
           )}
 
+          {activeTab === 'apply' && isLive && <HowToApply tender={tender} />}
+
           {activeTab === 'notes' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -728,6 +777,27 @@ export default function TenderDetailPage() {
         </div>
 
         {/* Sidebar */}
+        {isLive ? (
+        <div className="space-y-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <Globe className="h-4 w-4" />
+              Live tender
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              This Europe tender is shown live from TED, the EU's official tender journal. TenderIQ doesn't store it,
+              so shortlisting, tags, owners and comments aren't available.
+            </p>
+            <button
+              type="button"
+              onClick={() => setActiveTab('apply')}
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-900"
+            >
+              <Send className="h-4 w-4" /> How to apply
+            </button>
+          </div>
+        </div>
+        ) : (
         <div className="space-y-6">
           {/* Tags */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -831,6 +901,7 @@ export default function TenderDetailPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

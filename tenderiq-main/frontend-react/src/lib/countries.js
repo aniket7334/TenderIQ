@@ -29,7 +29,18 @@ export const ALL_COUNTRIES = ISO_CODES.map((code) => {
 
 /** Multilateral funders that publish tenders but aren't countries. */
 export const INTERNATIONAL_REGIONS = [
-  { value: 'European Union', label: 'European Union', flag: '🇪🇺' },
   { value: 'World Bank', label: 'World Bank', flag: '🏦' },
   { value: 'United Nations', label: 'United Nations', flag: '🇺🇳' },
 ];
+
+/* Europe: tenders for these regions are shown live from TED (the EU's official
+   tender journal) by the API — nothing is stored. Must match the backend's
+   list in backend-js/src/sources/ted.js. */
+export const EUROPE = 'Europe';
+export const EUROPE_COUNTRY_NAMES = [
+  'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus', 'Czechia', 'Denmark', 'Estonia', 'Finland', 'France',
+  'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland', 'Italy', 'Latvia', 'Liechtenstein', 'Lithuania',
+  'Luxembourg', 'Malta', 'Netherlands', 'Norway', 'Poland', 'Portugal', 'Romania', 'Slovakia', 'Slovenia',
+  'Spain', 'Sweden', 'Switzerland',
+];
+export const isEuropeRegion = (v) => v === EUROPE || EUROPE_COUNTRY_NAMES.includes(v);
