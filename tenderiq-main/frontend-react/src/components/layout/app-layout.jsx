@@ -125,7 +125,7 @@ export default function AppLayout({ children }) {
   };
 
   const initials =
-    user?.full_name
+    (user?.full_name || user?.fullName)
       ?.split(' ')
       .map((n) => n[0])
       .join('')
@@ -225,17 +225,18 @@ export default function AppLayout({ children }) {
       <div className="border-t border-white/10 px-3 py-3">
         <ul className="space-y-1">
           <li>
-            <button
-              type="button"
+            <Link
+              to="/settings"
               className={clsx(
-                'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white',
+                'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
+                isActive('/settings') ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white',
                 sidebarCollapsed && 'justify-center',
               )}
               title={sidebarCollapsed ? 'Settings' : undefined}
             >
               <Settings className="h-5 w-5 flex-shrink-0" />
               {!sidebarCollapsed && <span>Settings</span>}
-            </button>
+            </Link>
           </li>
           <li>
             <button
@@ -371,7 +372,7 @@ export default function AppLayout({ children }) {
               >
                 <div className="hidden text-right leading-tight sm:block">
                   <p className="text-sm font-semibold text-gray-900">
-                    {user?.full_name || 'User'}
+                    {(user?.full_name || user?.fullName) || 'User'}
                   </p>
                   <p className="text-xs text-gray-500">
                     {user?.role === 'admin' ? 'Procurement Lead' : (user?.role || 'Member')}
@@ -391,7 +392,7 @@ export default function AppLayout({ children }) {
                   <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
                     <div className="border-b border-gray-100 px-4 py-3">
                       <p className="text-sm font-medium text-gray-900">
-                        {user?.full_name || 'User'}
+                        {(user?.full_name || user?.fullName) || 'User'}
                       </p>
                       <p className="text-xs text-gray-500">
                         {user?.email || ''}
@@ -405,7 +406,10 @@ export default function AppLayout({ children }) {
                       Profile
                     </button>
                     <button
-                      onClick={() => setUserDropdownOpen(false)}
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        navigate('/settings');
+                      }}
                       className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
                       <Settings className="h-4 w-4" />

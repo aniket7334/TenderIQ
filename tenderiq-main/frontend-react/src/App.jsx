@@ -12,6 +12,7 @@ import TenderNotesPage from './pages/tender-notes';
 import TenderNoteDetailPage from './pages/tender-note-detail';
 import AlertsPage from './pages/alerts';
 import ShortlistedPage from './pages/shortlisted';
+import SettingsPage from './pages/settings';
 import AdminSourcesPage from './pages/admin/sources';
 import AdminKeywordsPage from './pages/admin/keywords';
 import AdminUsersPage from './pages/admin/users';
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/tenders" element={<TendersPage />} />
         <Route path="/tenders/:id" element={<TenderDetailPage />} />
         <Route path="/shortlisted" element={<ShortlistedPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/tender-notes" element={<TenderNotesPage />} />
         <Route path="/tender-notes/:id" element={<TenderNoteDetailPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
