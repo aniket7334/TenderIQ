@@ -179,7 +179,7 @@ Base path: **`/api/v1`**. All routes except auth and `/health` need a `Authoriza
 Changes to `ted-` tenders (shortlist, tags, comments, edits) are refused with a clear message — they aren't stored.
 
 ### Sources — `/sources` (scraping portals)
-`GET /`, `POST /`, `POST /scrape-all` (Scrape Now), `POST /scrape-type/:adapter` (GeM Now = `gem`), `GET|PATCH|DELETE /:id`, `POST /:id/scrape`, `GET /:id/runs`
+`GET /`, `GET /live` (live sources — TED — with status, open tenders, success rate, response time; `?fresh=1` asks TED again), `POST /`, `POST /scrape-all` (Scrape Now), `POST /scrape-type/:adapter` (GeM Now = `gem`), `GET|PATCH|DELETE /:id`, `POST /:id/scrape`, `GET /:id/runs`
 
 ### Alerts — `/alerts`
 `GET /` (feed), `GET /unread-count`, `GET /today` (today's new tenders, by category), `PATCH|POST /:id/read`, `POST /mark-all-read`, `POST /:id/delete`, `GET|PATCH /settings` (per-user notification settings)
@@ -266,6 +266,8 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 
 **Totals without storage:** TED returns the number of matching notices with every search, so counts are asked live (cached 10 minutes, never more than 6 s of waiting): the Dashboard's **Total tenders** = India tenders (stored) + Europe tenders (live), shown as "India N · Europe N (live)"; the Region dropdown shows **All Europe (N)** and the Sector field shows the live total for the Europe view or the chosen sector (e.g. Pipeline (312)).
 
+**Sources tab:** TED is a row in the same sources table as GeM. It is added by the page from `GET /sources/live` — not stored in the database, so Scrape All never tries to scrape it and it has no edit/delete. Its status and success rate come from the real TED calls the server makes.
+
 **Limits:** TED rate-limits busy clients (HTTP 429) — answers are cached in memory for 10 minutes and retried briefly. Europe tenders can't be shortlisted, tagged, commented or counted on the Dashboard (that needs storage). The UK is not on TED since Brexit (planned next: Find a Tender).
 
 ---
@@ -307,7 +309,7 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 | **Tender Notes** | AI-generated tender notes from templates; edit and export. |
 | **Alerts** | Today's new tenders (matching my alerts / all, by category), alert feed (All / Unread / New tenders / Closing soon), mark read, delete, mark all read; link to notification settings. |
 | **Settings** | Account details; **notification settings** (new tender alerts, closing-soon alerts with 1/3/7-day reminder, keywords-only, categories, browser notifications). |
-| **Admin** | Sources (portals, scrape runs), Keywords, Templates, Users (roles), Audit log. |
+| **Admin** | Sources — one table: GeM, port trusts (eTenders), CPPP, IREPS (edit, activate, scrape, history, delete) **and TED** (adapter TED, `https://ted.europa.eu`, Active/Busy, last checked, success rate, "Europe · live, not stored · N open"; actions: **Check now** and **Open Europe tenders**). Success rate is shown as the API's percentage. Keywords, Templates, Users (roles), Audit log. |
 
 ---
 
@@ -488,6 +490,7 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 24. **Project documentation** — this file; kept up to date with every change.
 25. **Europe tenders, live from TED** — Region filter gets "Europe — live from TED" (All Europe + 31 countries) and a City filter; the Tenders tab and tender page show TED tenders live with Documents and **How to apply**, **nothing stored**; categories mapped to CPV codes; opens on the marine/dredging/pipeline group.
 26. **Europe totals without storage** — Dashboard Total tenders includes the live Europe count ("India · Europe (live)"); Region shows All Europe (N) and Sector shows the live total for the Europe view / chosen sector.
+27. **TED in the Sources tab** — TED listed as a row in Admin → Sources next to GeM (Active, last checked, success rate, open tenders; Check now / Open Europe tenders). Fixed the Success Rate column showing 5000% (it multiplied a percentage by 100).
 
 ---
 

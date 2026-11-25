@@ -118,6 +118,9 @@ function categoriesFromCpv(codes) {
 
 const cache = new Map(); // key → { at, promise }
 
+// Health of the TED connection, updated on every real call (shown on the Sources page)
+const health = { last_ok_at: null, last_ms: null, last_error: null, last_error_at: null, calls: 0, ok_calls: 0 };
+
 async function tedSearch(body) {
     const key = JSON.stringify(body);
     const hit = cache.get(key);
@@ -125,6 +128,8 @@ async function tedSearch(body) {
     const promise = (async () => {
         for (let attempt = 1; ; attempt++) {
             let res;
+            const started = Date.now();
+            health.calls++;
             try {
                 res = await fetch(TED_SEARCH, {
                     method: 'POST',
@@ -134,15 +139,28 @@ async function tedSearch(body) {
                 });
             }
             catch (err) {
+                health.last_error = `Unreachable (${err.cause?.code || err.name})`;
+                health.last_error_at = new Date().toISOString();
                 throw new AppError(`Couldn't reach TED right now (${err.cause?.code || err.name}). Try again shortly.`, 503);
             }
             if (res.status === 429 && attempt < 3) {
                 await new Promise((r) => setTimeout(r, 1500 * attempt));
                 continue;
             }
-            if (res.status === 429) throw new AppError('TED is busy (too many requests). Please try again in a minute.', 503);
+            if (res.status === 429) {
+                health.last_error = 'Busy (rate limited by TED)';
+                health.last_error_at = new Date().toISOString();
+                throw new AppError('TED is busy (too many requests). Please try again in a minute.', 503);
+            }
             const data = await res.json().catch(() => null);
-            if (!res.ok) throw new AppError(`TED search failed: ${data?.message || `HTTP ${res.status}`}`, 502);
+            if (!res.ok) {
+                health.last_error = data?.message || `HTTP ${res.status}`;
+                health.last_error_at = new Date().toISOString();
+                throw new AppError(`TED search failed: ${health.last_error}`, 502);
+            }
+            health.last_ok_at = new Date().toISOString();
+            health.ok_calls++;
+            health.last_ms = Date.now() - started;
             return data;
         }
     })();
@@ -365,6 +383,39 @@ async function getDocuments(id) {
 const isLiveId = (id) => String(id || '').startsWith(ID_PREFIX);
 
 /**
+ * TED as a "live source" for the Sources page. `fresh` skips the cache so
+ * "Check now" really asks TED (one small request).
+ */
+async function sourceInfo({ fresh = false } = {}) {
+    if (fresh) {
+        for (const key of cache.keys()) if (key.includes('"limit":1,"page":1')) cache.delete(key);
+    }
+    const open_tenders = await countEurope({ waitMs: 12000 });
+    const ok = open_tenders != null;
+    return {
+        id: 'ted',
+        name: 'TED — Tenders Electronic Daily (EU)',
+        type: 'live',
+        base_url: 'https://api.ted.europa.eu/v3/notices/search',
+        website: 'https://ted.europa.eu',
+        coverage: `${Object.keys(EUROPE_COUNTRIES).length} countries — EU 27, Norway, Iceland, Switzerland, Liechtenstein`,
+        storage: 'Not stored — read live (10-minute memory cache)',
+        api_key: 'Not needed',
+        default_view: 'Dredging, marine, pipeline & shipping tenders',
+        status: ok ? 'online' : (health.last_error && /Busy/.test(health.last_error) ? 'busy' : 'unreachable'),
+        open_tenders,
+        response_ms: health.last_ms,
+        last_ok_at: health.last_ok_at,
+        last_error: ok ? null : health.last_error,
+        last_error_at: ok ? null : health.last_error_at,
+        calls_since_start: health.calls,
+        // Same meaning as scraped sources' success rate: % of recent requests that worked
+        success_rate: health.calls ? Math.round((health.ok_calls / health.calls) * 100) : null,
+        checked_at: new Date().toISOString(),
+    };
+}
+
+/**
  * How many open tenders the default Europe view has (All Europe, dredging /
  * marine / pipeline / shipping group). Asked live (TED returns the count with
  * every search), cached like any TED answer. Never waits longer than
@@ -378,7 +429,7 @@ async function countEurope({ waitMs = 6000 } = {}) {
 
 module.exports = {
     EUROPE, EUROPE_COUNTRIES, isEuropeRegion, isLiveId,
-    searchTenders, getTender, getDocuments, countEurope,
+    searchTenders, getTender, getDocuments, countEurope, sourceInfo,
     // for tests
     categoriesFromCpv, categoryClause, tedDate,
 };

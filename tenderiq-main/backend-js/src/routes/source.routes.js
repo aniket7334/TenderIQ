@@ -91,6 +91,17 @@ router.post('/scrape-all', auth_1.authenticate, (0, auth_1.requireRole)('admin')
         res.status(500).json({ detail: 'Internal server error' });
     }
 });
+// GET /live - Sources read live and never stored (TED for Europe), with a health check.
+// ?fresh=1 asks TED again instead of using the 10-minute cache. Defined before /:source_id.
+router.get('/live', auth_1.authenticate, async (req, res) => {
+    try {
+        const ted = require('../sources/ted');
+        res.json({ items: [await ted.sourceInfo({ fresh: req.query.fresh === '1' })] });
+    }
+    catch (err) {
+        res.status(500).json({ detail: 'Could not check live sources' });
+    }
+});
 // POST /scrape-type/:adapter - Scrape only the source(s) of one portal, e.g. "gem"
 // (used by the dashboard's "GeM Now" button). Defined before /:source_id routes.
 router.post('/scrape-type/:adapter', auth_1.authenticate, (0, auth_1.requireRole)('admin'), async (req, res) => {

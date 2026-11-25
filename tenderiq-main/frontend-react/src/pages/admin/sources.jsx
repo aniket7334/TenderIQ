@@ -14,6 +14,7 @@ import {
   RefreshCw,
   X,
   CheckCircle,
+  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +35,9 @@ export default function SourcesPage() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const [sources, setSources] = useState([]);
+  // Live sources (TED for Europe) aren't in the database; they're listed in the same table
+  const [liveSources, setLiveSources] = useState([]);
+  const [checkingLive, setCheckingLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -65,8 +69,12 @@ export default function SourcesPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get('/sources');
+      const [res, live] = await Promise.all([
+        api.get('/sources'),
+        api.get('/sources/live', { timeout: 60000 }).catch(() => null),
+      ]);
       setSources(res.data.items || res.data || []);
+      setLiveSources(live?.data?.items || []);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load sources';
       setError(message);
@@ -186,7 +194,44 @@ export default function SourcesPage() {
     }
   };
 
+  // Ask TED again now (one small request) and update its row
+  const handleCheckLive = async () => {
+    try {
+      setCheckingLive(true);
+      const res = await api.get('/sources/live', { params: { fresh: 1 }, timeout: 60000 });
+      const items = res.data.items || [];
+      setLiveSources(items);
+      const ted = items[0];
+      setToast(ted?.status === 'online' ? `TED is online — ${(ted.open_tenders ?? 0).toLocaleString()} open tenders` : 'TED did not answer — try again shortly');
+    } catch {
+      // handled by interceptor
+    } finally {
+      setCheckingLive(false);
+    }
+  };
+
+  // TED shown as a normal row: name, adapter, URL, status, last checked, success rate
+  const rows = [
+    ...sources,
+    ...liveSources.map((s) => ({
+      id: `live-${s.id}`,
+      live: true,
+      name: 'TED',
+      adapter_type: 'ted',
+      base_url: 'https://ted.europa.eu',
+      is_active: true,
+      status: s.status,
+      last_scraped_at: s.last_ok_at,
+      success_rate: s.success_rate,
+      open_tenders: s.open_tenders,
+    })),
+  ];
+
   const getStatusBadge = (source) => {
+    if (source.live) {
+      if (source.status === 'online') return <Badge variant="success">Active</Badge>;
+      return <Badge variant="default">{source.status === 'busy' ? 'Busy' : 'Unreachable'}</Badge>;
+    }
     if (!source.is_active) return <Badge variant="default">Inactive</Badge>;
     if (source.status === 'error') return <Badge variant="danger">Error</Badge>;
     return <Badge variant="success">Active</Badge>;
@@ -221,7 +266,7 @@ export default function SourcesPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Source Management</h1>
-            <p className="mt-1 text-sm text-gray-500">{sources.length} sources configured</p>
+            <p className="mt-1 text-sm text-gray-500">{rows.length} sources configured</p>
           </div>
           <Button onClick={openAddModal} variant="primary" size="md" className="self-start sm:self-auto">
             <Plus className="h-4 w-4" />
@@ -244,7 +289,7 @@ export default function SourcesPage() {
                 Retry
               </Button>
             </div>
-          ) : sources.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Globe className="mb-3 h-10 w-10 text-gray-300" />
               <p className="text-sm font-medium text-gray-600">No sources configured</p>
@@ -265,10 +310,15 @@ export default function SourcesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {sources.map((source) => (
+                  {rows.map((source) => (
                     <tr key={source.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-4 text-sm font-medium text-gray-900 sm:px-6 sm:whitespace-nowrap">
                         <span className="line-clamp-2 sm:line-clamp-none">{source.name}</span>
+                        {source.live && (
+                          <span className="block text-xs font-normal text-gray-500">
+                            Europe · live, not stored{source.open_tenders != null ? ` · ${source.open_tenders.toLocaleString()} open` : ''}
+                          </span>
+                        )}
                       </td>
                       <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                         <Badge variant="info">{source.adapter_type?.toUpperCase() || 'N/A'}</Badge>
@@ -281,9 +331,28 @@ export default function SourcesPage() {
                         {source.last_scraped_at ? formatDate(source.last_scraped_at) : 'Never'}
                       </td>
                       <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                        {source.success_rate != null ? `${Math.round(source.success_rate * 100)}%` : '-'}
+                        {source.success_rate != null ? `${Math.round(source.success_rate)}%` : '-'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-4 text-right sm:px-6">
+                        {source.live ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={handleCheckLive}
+                            disabled={checkingLive}
+                            title="Check TED now"
+                            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+                          >
+                            {checkingLive ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => navigate('/tenders?country=Europe')}
+                            title="Open Europe tenders"
+                            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          >
+                            <ArrowRight className="h-4 w-4" />
+                          </button>
+                        </div>
+                        ) : (
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => openEditModal(source)} title="Edit" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
                             <Edit className="h-4 w-4" />
@@ -306,6 +375,7 @@ export default function SourcesPage() {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
+                        )}
                       </td>
                     </tr>
                   ))}
