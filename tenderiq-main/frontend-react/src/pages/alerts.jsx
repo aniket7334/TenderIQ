@@ -309,8 +309,8 @@ export default function AlertsPage() {
 
       {/* Turn-on banner */}
       {settings && !anyOn && (
-        <div className="flex flex-col gap-3 rounded-xl border border-gold-300/60 bg-gold-100/40 px-5 py-4 sm:flex-row sm:items-center">
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-900 text-gold-300">
+        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-900 text-white">
             <BellRing className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -555,7 +555,7 @@ export default function AlertsPage() {
         <aside className="min-w-0">
           <section className="rounded-xl border border-gray-200 bg-white shadow-sm xl:sticky xl:top-2">
             <header className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
-              <Bell className="h-[18px] w-[18px] text-gold-600" />
+              <Bell className="h-[18px] w-[18px] text-gray-500" />
               <h2 className="text-base font-semibold text-gray-900">Notification settings</h2>
               {savingKey && <Loader2 className="ml-auto h-4 w-4 animate-spin text-gray-400" />}
             </header>

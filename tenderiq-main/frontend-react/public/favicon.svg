@@ -1,10 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>TenderIQ</title>
-  <!-- Classic navy tile with a fine gold frame, matching the app sidebar logo -->
+  <!-- Classic navy tile with a white briefcase, matching the app sidebar logo -->
   <rect width="64" height="64" rx="14" fill="#15243e"/>
-  <rect x="3.5" y="3.5" width="57" height="57" rx="11" fill="none" stroke="#b08a3e" stroke-opacity=".55" stroke-width="1.5"/>
-  <!-- Briefcase (tenders) in gold -->
-  <g fill="none" stroke="#dcc08a" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" transform="translate(12 12) scale(1.6667)">
+  <g fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" transform="translate(12 12) scale(1.6667)">
     <rect x="2" y="7" width="20" height="14" rx="2.2"/>
     <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
   </g>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TenderIQ – Dashboard samples</title>
+<style>
+  :root {
+    --navy: #15243e; --navy-2: #2d4a7c; --ink: #1f1d1a; --muted: #6f6b63; --faint: #9a958c;
+    --line: #e6e4df; --line-2: #f0eeea; --bg: #f7f6f3; --card: #fff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 -apple-system, "Segoe UI", Inter, Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+         padding: 12px 20px; background: var(--navy); color: #fff; }
+  .bar b { margin-right: 12px; font-weight: 600; }
+  .bar button { border: 1px solid rgba(255,255,255,.25); background: transparent; color: #fff; padding: 6px 12px;
+                border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; }
+  .bar button.on { background: #fff; color: var(--navy); border-color: #fff; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
+  .sample { display: none; } .sample.on { display: block; }
+  .note { font-size: 13px; color: var(--muted); margin: 0 0 22px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 8px; background: #fff; }
+  h1 { font-family: "Source Serif 4", Georgia, serif; font-size: 28px; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 4px 0 0; font-size: 13px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 14px; border-radius: 8px; font: inherit; font-weight: 500; }
+  .btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+  .stat { padding: 18px 20px; }
+  .stat .l { color: var(--muted); font-size: 13px; font-weight: 500; }
+  .stat .v { font-size: 30px; font-weight: 600; margin-top: 6px; letter-spacing: -.02em; }
+  .stat .n { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .ph { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 20px; border-bottom: 1px solid var(--line-2); }
+  .ph h2 { font-size: 15px; margin: 0; } .ph p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .ph a { color: var(--navy-2); font-weight: 500; text-decoration: none; font-size: 13px; }
+  ul.rows { list-style: none; margin: 0; padding: 0; }
+  ul.rows li { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-top: 1px solid var(--line-2); }
+  ul.rows li:first-child { border-top: 0; }
+  .t { flex: 1; min-width: 0; } .t p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t .m { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .r { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .r strong { display: block; color: var(--ink); font-size: 13px; font-weight: 500; }
+  .soon { color: var(--ink); font-weight: 600; }
+  .tag { border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .chart { display: flex; align-items: flex-end; gap: 14px; height: 180px; padding: 10px 20px 0; }
+  .chart div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; font-size: 11px; color: var(--faint); }
+  .chart span { width: 100%; max-width: 34px; background: var(--navy-2); border-radius: 4px 4px 0 0; }
+  .big { font-size: 24px; font-weight: 600; padding: 14px 20px 0; } .big small { font-size: 13px; font-weight: 400; color: var(--muted); }
+  /* Sample B */
+  .strip { display: flex; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .strip > div { flex: 1; padding: 16px 20px; border-left: 1px solid var(--line-2); }
+  .strip > div:first-child { border-left: 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 600; padding: 10px 20px; border-bottom: 1px solid var(--line); background: #fbfaf8; }
+  td { padding: 12px 20px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td .m { color: var(--muted); font-size: 12px; }
+  /* Sample C */
+  .split { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+  .kv { padding: 6px 20px 14px; } .kv div { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+  .kv div:last-child { border-bottom: 0; } .kv b { font-weight: 600; }
+  .date { width: 44px; flex: none; text-align: center; border: 1px solid var(--line); border-radius: 8px; padding: 4px 0; }
+  .date b { display: block; font-size: 16px; } .date i { font-style: normal; font-size: 10px; color: var(--muted); text-transform: uppercase; }
+  @media (max-width: 900px) {
+    .grid4 { grid-template-columns: 1fr 1fr; } .grid2, .split { grid-template-columns: 1fr; }
+    .strip { flex-wrap: wrap; } .strip > div { flex: 1 1 50%; border-left: 0; border-top: 1px solid var(--line-2); }
+    .hide-sm { display: none; }
+  }
+  @media (max-width: 520px) { .grid4 { grid-template-columns: 1fr; } .r.hide-xs { display: none; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>TenderIQ · Dashboard samples</b>
+  <button class="on" data-s="a">A · Classic cards (built)</button>
+  <button data-s="b">B · Ledger table</button>
+  <button data-s="c">C · Focus + summary</button>
+</div>
+
+<div class="wrap">
+
+<!-- ============ SAMPLE A ============ -->
+<section class="sample on" id="a">
+  <p class="note"><b>Sample A — Classic cards.</b> This is what's built into the app now: four plain number cards, deadlines and a monthly chart side by side, then the 5 most recent tenders. Navy and grey only, no red.</p>
+  <div class="head">
+    <div><h1>Dashboard</h1><p class="sub">Overview of your tender pipeline</p></div>
+    <div class="btns"><span class="btn">Refresh</span><span class="btn">GeM Now</span><span class="btn primary">Scrape Now</span></div>
+  </div>
+  <div class="grid4">
+    <div class="card stat"><div class="l">Total tenders</div><div class="v">12,256</div><div class="n">148 added today</div></div>
+    <div class="card stat"><div class="l">Shortlisted</div><div class="v">37</div><div class="n">Marked for follow-up</div></div>
+    <div class="card stat"><div class="l">Pending review</div><div class="v">9,814</div><div class="n">Not yet reviewed</div></div>
+    <div class="card stat"><div class="l">Closing soon</div><div class="v">412</div><div class="n">Within the next 7 days</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="ph"><div><h2>Upcoming deadlines</h2><p>The next tenders to close</p></div><a href="#">View all →</a></div>
+      <ul class="rows" data-list="deadlines"></ul>
+    </div>
+    <div class="card">
+      <div class="ph"><div><h2>Tenders per month</h2><p>Added in the last 6 months</p></div></div>
+      <div class="big">2,904 <small>this month</small></div>
+      <div class="chart" data-chart></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px">
+    <div class="ph"><div><h2>Recent tenders</h2><p>Latest 5 added</p></div><a href="#">View all →</a></div>
+    <ul class="rows" data-list="recent"></ul>
+  </div>
+</section>
+
+<!-- ============ SAMPLE B ============ -->
+<section class="sample" id="b">
+  <p class="note"><b>Sample B — Ledger table.</b> One slim strip of numbers, then a single table like a register. Very calm; best if your team mostly scans lists.</p>
+  <div class="head">
+    <div><h1>Dashboard</h1><p class="sub">Wednesday, 25 November 2026</p></div>
+    <div class="btns"><span class="btn">GeM Now</span><span class="btn primary">Scrape Now</span></div>
+  </div>
+  <div class="strip">
+    <div><div class="stat l" style="padding:0">Total tenders</div><div style="font-size:22px;font-weight:600">12,256</div></div>
+    <div><div class="l" style="color:var(--muted);font-size:13px">Added today</div><div style="font-size:22px;font-weight:600">148</div></div>
+    <div><div style="color:var(--muted);font-size:13px">Shortlisted</div><div style="font-size:22px;font-weight:600">37</div></div>
+    <div><div style="color:var(--muted);font-size:13px">Closing in 7 days</div><div style="font-size:22px;font-weight:600">412</div></div>
+  </div>
+  <div class="card" style="margin-top:20px">
+    <div class="ph"><div><h2>Closing next</h2></div><a href="#">All deadlines →</a></div>
+    <table><thead><tr><th>Tender</th><th class="hide-sm">Organisation</th><th>Closes</th></tr></thead><tbody data-table="deadlines"></tbody></table>
+  </div>
+  <div class="card" style="margin-top:20px">
+    <div class="ph"><div><h2>Recently added</h2></div><a href="#">All tenders →</a></div>
+    <table><thead><tr><th>Tender</th><th class="hide-sm">Value</th><th>Status</th></tr></thead><tbody data-table="recent"></tbody></table>
+  </div>
+</section>
+
+<!-- ============ SAMPLE C ============ -->
+<section class="sample" id="c">
+  <p class="note"><b>Sample C — Focus + summary.</b> The main column is just what needs attention (deadlines as calendar dates, then 5 recent tenders); the numbers sit quietly in a side panel.</p>
+  <div class="head">
+    <div><h1>Good morning</h1><p class="sub">Here's what needs your attention today</p></div>
+    <div class="btns"><span class="btn">Refresh</span><span class="btn primary">Scrape Now</span></div>
+  </div>
+  <div class="split">
+    <div>
+      <div class="card">
+        <div class="ph"><div><h2>Closing this week</h2><p>412 tenders close in the next 7 days</p></div><a href="#">View all →</a></div>
+        <ul class="rows" data-list="calendar"></ul>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <div class="ph"><div><h2>Recent tenders</h2><p>Latest 5 added</p></div><a href="#">View all →</a></div>
+        <ul class="rows" data-list="recent"></ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ph"><div><h2>Summary</h2></div></div>
+        <div class="kv">
+          <div><span>Total tenders</span><b>12,256</b></div>
+          <div><span>Added today</span><b>148</b></div>
+          <div><span>Shortlisted</span><b>37</b></div>
+          <div><span>Pending review</span><b>9,814</b></div>
+          <div><span>This month</span><b>2,904</b></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <div class="ph"><div><h2>Per month</h2></div></div>
+        <div class="chart" data-chart style="height:140px;padding-bottom:12px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
+<script>
+  const deadlines = [
+    ['Supply of Laboratory Glassware and Consumables', 'AIIMS Nagpur', 0, '25 Nov'],
+    ['Annual Maintenance of CCTV Surveillance System', 'Indian Railways – CR', 1, '26 Nov'],
+    ['Procurement of Desktop Computers (i5, 16 GB)', 'Ministry of Defence', 2, '27 Nov'],
+    ['Housekeeping Services for District Hospital', 'Govt. of Maharashtra', 4, '29 Nov'],
+    ['Solar Street Light Installation – 120 Units', 'MSEDCL', 6, '1 Dec'],
+  ];
+  const recent = [
+    ['Hiring of Manpower Outsourcing Services – Skilled', 'Bharat Sanchar Nigam Ltd', 'GeM', '₹ 48.6 L', 'New'],
+    ['Supply of Office Furniture for New Building', 'NTPC Limited', 'GeM', '₹ 12.3 L', 'New'],
+    ['Repair and Painting of Staff Quarters', 'CPWD', 'CPPP', '₹ 86.0 L', 'Reviewed'],
+    ['Purchase of Water Purifiers (RO + UV)', 'Kendriya Vidyalaya Sangathan', 'GeM', '₹ 4.2 L', 'New'],
+    ['Network Switches and Cabling – Campus LAN', 'IIT Bombay', 'eTenders', '₹ 31.8 L', 'Shortlisted'],
+  ];
+  const months = [['Jun', 1210], ['Jul', 1580], ['Aug', 1940], ['Sep', 2210], ['Oct', 2650], ['Nov', 2904]];
+  const left = (d) => (d === 0 ? 'Today' : d === 1 ? '1 day left' : d + ' days left');
+
+  document.querySelectorAll('[data-list="deadlines"]').forEach((ul) => {
+    ul.innerHTML = deadlines.map(([t, o, d, dt]) =>
+      `<li><div class="t"><p>${t}</p><p class="m">${o} · ${dt} 2026</p></div><span class="r ${d <= 1 ? 'soon' : ''}">${left(d)}</span></li>`).join('');
+  });
+  document.querySelectorAll('[data-list="calendar"]').forEach((ul) => {
+    ul.innerHTML = deadlines.map(([t, o, d, dt]) => { const [day, mon] = dt.split(' ');
+      return `<li><div class="date"><b>${day}</b><i>${mon}</i></div><div class="t"><p>${t}</p><p class="m">${o}</p></div><span class="r hide-xs ${d <= 1 ? 'soon' : ''}">${left(d)}</span></li>`; }).join('');
+  });
+  document.querySelectorAll('[data-list="recent"]').forEach((ul) => {
+    ul.innerHTML = recent.map(([t, o, s, v, st]) =>
+      `<li><div class="t"><p>${t}</p><p class="m">${o} · ${s}</p></div><span class="r hide-xs"><strong>${v}</strong>Closes 3 Dec</span><span class="tag hide-sm">${st}</span></li>`).join('');
+  });
+  document.querySelector('[data-table="deadlines"]').innerHTML = deadlines.map(([t, o, d, dt]) =>
+    `<tr><td>${t}<div class="m">${dt} 2026</div></td><td class="hide-sm m">${o}</td><td class="${d <= 1 ? 'soon' : 'm'}" style="white-space:nowrap">${left(d)}</td></tr>`).join('');
+  document.querySelector('[data-table="recent"]').innerHTML = recent.map(([t, o, s, v, st]) =>
+    `<tr><td>${t}<div class="m">${o} · ${s}</div></td><td class="hide-sm" style="white-space:nowrap">${v}</td><td><span class="tag">${st}</span></td></tr>`).join('');
+  const max = Math.max(...months.map((m) => m[1]));
+  document.querySelectorAll('[data-chart]').forEach((c) => {
+    c.innerHTML = months.map(([m, v]) => `<div><span style="height:${Math.round((v / max) * 80)}%" title="${v}"></span>${m}</div>`).join('');
+  });
+  document.querySelectorAll('.bar button').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('.bar button').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.sample').forEach((s) => s.classList.toggle('on', s.id === b.dataset.s));
+    scrollTo(0, 0);
+  });
+</script>
+</body>
+</html>

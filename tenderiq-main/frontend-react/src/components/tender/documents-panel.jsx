@@ -123,7 +123,7 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
     <div className="space-y-5">
       {/* Source bar */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3.5 shadow-sm">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-900 text-gold-300">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-900 text-white">
           <Landmark className="h-[18px] w-[18px]" strokeWidth={1.75} />
         </span>
         <div className="min-w-0">
@@ -171,7 +171,7 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
         {/* Required documents checklist */}
         <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
           <header className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5">
-            <ShieldCheck className="h-[18px] w-[18px] text-gold-600" />
+            <ShieldCheck className="h-[18px] w-[18px] text-gray-500" />
             <h3 className="text-sm font-semibold text-gray-900">Documents you must submit</h3>
             {required.length > 0 && (
               <span className="ml-auto rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">{required.length}</span>
@@ -200,7 +200,7 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
         {/* Key terms */}
         <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
           <header className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5">
-            <ScrollText className="h-[18px] w-[18px] text-gold-600" />
+            <ScrollText className="h-[18px] w-[18px] text-gray-500" />
             <h3 className="text-sm font-semibold text-gray-900">Key bid terms</h3>
           </header>
           {terms.length > 0 ? (
@@ -218,7 +218,7 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
       {/* Files */}
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <header className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5">
-          <FileText className="h-[18px] w-[18px] text-gold-600" />
+          <FileText className="h-[18px] w-[18px] text-gray-500" />
           <h3 className="text-sm font-semibold text-gray-900">Tender documents</h3>
           <span className="ml-auto text-xs text-gray-500">{items.length} file{items.length === 1 ? '' : 's'}</span>
         </header>

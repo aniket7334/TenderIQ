@@ -26,7 +26,7 @@ export default {
       },
       colors: {
         // Classic premium palette: one deep navy replaces the bright blue/indigo
-        // used across the app, plus warm neutrals and a muted gold accent.
+        // used across the app and warm neutrals.
         brand: NAVY,
         blue: NAVY,
         indigo: NAVY,
@@ -42,13 +42,6 @@ export default {
           800: '#2d2c28',
           900: '#1d1c19',
           950: '#11100e',
-        },
-        gold: {
-          100: '#f5ecd9',
-          300: '#dcc08a',
-          500: '#b08a3e',
-          600: '#94722f',
-          700: '#755a25',
         },
       },
       width: {

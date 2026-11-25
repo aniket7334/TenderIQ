@@ -136,13 +136,13 @@ export default function AppLayout({ children }) {
       {/* Logo */}
       <div className="flex h-20 items-center border-b border-white/10 px-5">
         <Link to="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gold-500/60 bg-white/5 text-gold-300">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white">
             <Briefcase className="h-5 w-5" strokeWidth={1.75} />
           </div>
           {!sidebarCollapsed && (
             <div className="flex flex-col leading-tight">
               <span className="font-serif text-[19px] font-semibold tracking-tight text-white">TenderIQ</span>
-              <span className="whitespace-nowrap text-[9.5px] font-medium uppercase tracking-[0.12em] text-gold-300/80">
+              <span className="whitespace-nowrap text-[9.5px] font-medium uppercase tracking-[0.12em] text-white/50">
                 Enterprise Procurement
               </span>
             </div>
@@ -186,13 +186,13 @@ export default function AppLayout({ children }) {
                       className={clsx(
                         'relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
                         active
-                          ? 'bg-white/10 text-white before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-gold-500'
+                          ? 'bg-white/10 text-white before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-white'
                           : 'text-white/60 hover:bg-white/5 hover:text-white',
                         sidebarCollapsed && 'justify-center',
                       )}
                       title={sidebarCollapsed ? item.label : undefined}
                     >
-                      <Icon className={clsx('h-[18px] w-[18px] flex-shrink-0', active ? 'text-gold-300' : 'text-white/45')} strokeWidth={1.75} />
+                      <Icon className={clsx('h-[18px] w-[18px] flex-shrink-0', active ? 'text-white' : 'text-white/45')} strokeWidth={1.75} />
                       {!sidebarCollapsed && <span>{item.label}</span>}
                     </Link>
                   </li>
@@ -375,7 +375,7 @@ export default function AppLayout({ children }) {
                     {user?.role === 'admin' ? 'Procurement Lead' : (user?.role || 'Member')}
                   </p>
                 </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-900 font-serif sm:h-10 sm:w-10 text-sm font-semibold text-gold-300 ring-2 ring-gold-500/40">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-900 font-serif sm:h-10 sm:w-10 text-sm font-semibold text-white ring-2 ring-gray-200">
                   {initials}
                 </div>
               </button>
