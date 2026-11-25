@@ -11,7 +11,8 @@
     "copy-data": "node scripts/copy-data.js",
     "make-admin": "node scripts/make-admin.js",
     "db-check": "node scripts/db-check.js",
-    "set-password": "node scripts/set-password.js"
+    "set-password": "node scripts/set-password.js",
+    "create-admin": "node scripts/create-admin.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

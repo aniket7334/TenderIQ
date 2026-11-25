@@ -14,60 +14,7 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const { pool } = require('../src/db');
 
-// Piped input (non-interactive): read all lines once, hand them out in order
-let pipedLines = null;
-async function nextPipedLine() {
-    if (!pipedLines) {
-        let data = '';
-        for await (const chunk of process.stdin) data += chunk;
-        pipedLines = data.split(/\r?\n/);
-    }
-    return pipedLines.length ? pipedLines.shift() : '';
-}
-
-/** Read one line without echoing it (falls back to plain stdin when piped). */
-function askHidden(question) {
-    process.stdout.write(question);
-    if (!process.stdin.isTTY) {
-        return nextPipedLine().then((line) => {
-            process.stdout.write('\n');
-            return line;
-        });
-    }
-    return new Promise((resolve) => {
-        const stdin = process.stdin;
-        let value = '';
-        stdin.setRawMode(true);
-        stdin.resume();
-        stdin.setEncoding('utf8');
-        const onKey = (key) => {
-            for (const ch of key) {
-                if (ch === '\r' || ch === '\n') {
-                    stdin.setRawMode(false);
-                    stdin.pause();
-                    stdin.removeListener('data', onKey);
-                    process.stdout.write('\n');
-                    resolve(value);
-                    return;
-                }
-                if (ch === '\u0003') { // Ctrl+C
-                    process.stdout.write('\n');
-                    process.exit(1);
-                }
-                if (ch === '\u0008' || ch === '\u007f') { // Backspace
-                    if (value.length) {
-                        value = value.slice(0, -1);
-                        process.stdout.write('\b \b');
-                    }
-                    continue;
-                }
-                value += ch;
-                process.stdout.write('*');
-            }
-        };
-        stdin.on('data', onKey);
-    });
-}
+const { askHidden, passwordProblem } = require('./lib/prompt');
 
 (async () => {
     const email = (process.argv[2] || '').trim().toLowerCase();
@@ -82,8 +29,8 @@ function askHidden(question) {
     }
 
     const pw = await askHidden('New password (min 8 characters, letters and numbers): ');
-    if (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) {
-        console.error('Password must be at least 8 characters and include a letter and a number.');
+    if (passwordProblem(pw)) {
+        console.error(passwordProblem(pw));
         process.exit(1);
     }
     const again = await askHidden('Type it again: ');
