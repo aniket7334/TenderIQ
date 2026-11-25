@@ -309,7 +309,7 @@ async function syncGem() {
 /** Latest GeM sync result, for the "Live" indicator and /health. */
 async function getGemSyncStatus() {
     const [rows] = await pool.execute(
-        `SELECT r.status, r.started_at, r.completed_at, r.tenders_new, r.error_log
+        `SELECT r.status, r.started_at, r.completed_at, r.tenders_found, r.tenders_new, r.error_log
            FROM scrape_runs r JOIN tender_sources s ON s.id = r.source_id
           WHERE s.adapter_type = 'gem'
           ORDER BY r.started_at DESC LIMIT 5`
@@ -322,6 +322,7 @@ async function getGemSyncStatus() {
         last_run_at: last?.started_at || null,
         last_success_at: lastOk?.completed_at || null,
         last_new: lastOk ? Number(lastOk.tenders_new || 0) : null,
+        last_read: lastOk ? Number(lastOk.tenders_found || 0) : null,
         last_error: last?.status === 'failed' ? String(last.error_log || '').slice(0, 200) : null,
     };
 }
