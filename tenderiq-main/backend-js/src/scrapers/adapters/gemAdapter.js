@@ -252,7 +252,10 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
                 docs = data.response.response.docs;
             else if (Array.isArray(data?.data))
                 docs = data.data;
+            if (!docs.length)
+                this.lastError = `GeM search answered HTTP ${response.status} with no bids (${String(typeof data === 'string' ? data : JSON.stringify(data)).slice(0, 120)})`;
             if (docs.length > 0) {
+                this.lastError = null;
                 console.log(`[GeM] API returned ${docs.length} bids`);
                 return docs.map((item) => this.normalizeApiItem(item));
             }
@@ -260,6 +263,8 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
         }
         catch (err) {
             console.log(`[GeM] Strategy 1 failed: ${err.message}`);
+            // Kept so a run that reads nothing can say why (shown in sync status)
+            this.lastError = `GeM search failed: ${err.response ? `HTTP ${err.response.status}` : (err.code || err.message)}`;
             return [];
         }
     }

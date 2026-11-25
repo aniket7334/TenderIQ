@@ -252,13 +252,17 @@ async function scrapeSource(sourceId, opts = {}) {
         if (tendersSkipped)
             console.log(`[Scrape] ${source.name}: skipped ${tendersSkipped} listings that match none of our categories`);
 
+        // A run that read nothing at all didn't really work — record why
+        const emptyRun = tendersFound === 0 && adapter.lastError;
         await pool.execute(
-            'UPDATE scrape_runs SET status = ?, tenders_found = ?, tenders_new = ?, completed_at = NOW() WHERE id = ?',
-            ['completed', tendersFound, tendersNew, runId]
+            'UPDATE scrape_runs SET status = ?, tenders_found = ?, tenders_new = ?, error_log = ?, completed_at = NOW() WHERE id = ?',
+            [emptyRun ? 'failed' : 'completed', tendersFound, tendersNew, emptyRun ? adapter.lastError : null, runId]
         );
+        if (emptyRun)
+            console.warn(`[Scrape] ${source.name}: read nothing — ${adapter.lastError}`);
         // A run cut short didn't reach the previous run's bids, so don't move
         // the "caught up to" mark (the next run re-reads from the same point)
-        if (!timedOut)
+        if (!timedOut && !emptyRun)
             await pool.execute(
                 'UPDATE tender_sources SET last_scraped_at = NOW() WHERE id = ?',
                 [sourceId]
