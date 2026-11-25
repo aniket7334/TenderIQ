@@ -2,7 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startScheduler = startScheduler;
 const cron = require("node-cron");
-const { scrapeAllSources, cleanupOldRuns } = require("./scrapeTasks");
+const { scrapeAllSources, cleanupOldRuns, syncGem } = require("./scrapeTasks");
+
+// How often to pull new bids from GeM (minutes). Each run only reads bids
+// published since the previous one, so it is quick and light on GeM.
+const GEM_SYNC_MINUTES = Math.min(59, Math.max(2, Number(process.env.GEM_SYNC_MINUTES) || 5));
 const { checkUpcomingDeadlines, generateNewTenderAlerts } = require("./alertTasks");
 const { extractAllPending } = require("./extractionTasks");
 
@@ -20,6 +24,26 @@ function startScheduler() {
             console.error('[Scheduler] Hourly scrape failed:', err);
         }
     });
+
+    // Live GeM sync: new bids appear in the app within a few minutes
+    cron.schedule(`*/${GEM_SYNC_MINUTES} * * * *`, () => {
+        syncGem().catch((err) => console.error('[Scheduler] GeM sync failed:', err));
+    });
+    // Catch up right after start (e.g. when the free server wakes from sleep).
+    // Nothing can be running yet in a fresh process, so any "running" run was
+    // cut off by the restart — close it so it doesn't block this sync.
+    setTimeout(async () => {
+        try {
+            const { pool } = require('../db');
+            await pool.execute(
+                "UPDATE scrape_runs SET status = 'failed', error_log = 'Interrupted (server restarted)', completed_at = NOW() WHERE status = 'running'"
+            );
+            await syncGem();
+        }
+        catch (err) {
+            console.error('[Scheduler] Startup GeM sync failed:', err);
+        }
+    }, 15000);
 
     // New-tender alerts for users who switched them on (Alerts page)
     cron.schedule('*/15 * * * *', async () => {
@@ -64,5 +88,5 @@ function startScheduler() {
         }
     });
 
-    console.log('Scheduler started with tasks: scrape (every 1h), new-tender alerts (15m), deadlines (daily 8am), extraction (30m), cleanup (weekly)');
+    console.log(`Scheduler started with tasks: GeM sync (every ${GEM_SYNC_MINUTES}m), scrape all (every 1h), new-tender alerts (15m), deadlines (daily 8am), extraction (30m), cleanup (weekly)`);
 }

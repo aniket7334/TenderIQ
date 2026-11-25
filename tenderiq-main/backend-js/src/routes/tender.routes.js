@@ -74,6 +74,30 @@ router.get('/', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ detail: 'Internal server error' });
     }
 });
+// GET /updates?since=ISO - How many tenders arrived since the given time, plus
+// the live GeM sync status. Polled by the dashboard and Tenders page (cheap).
+router.get('/updates', auth_1.authenticate, async (req, res) => {
+    try {
+        const { pool } = require('../db');
+        const { getGemSyncStatus } = require('../workers/scrapeTasks');
+        const since = new Date(String(req.query.since || ''));
+        const [[latest]] = await pool.execute('SELECT MAX(created_at) AS latest FROM tenders');
+        let newCount = 0;
+        if (!Number.isNaN(since.getTime())) {
+            const [[row]] = await pool.execute('SELECT COUNT(*) AS c FROM tenders WHERE created_at > ?', [since]);
+            newCount = Number(row.c);
+        }
+        res.json({
+            new_count: newCount,
+            latest_created_at: latest.latest,
+            server_time: new Date().toISOString(),
+            sync: await getGemSyncStatus(),
+        });
+    }
+    catch (err) {
+        res.status(500).json({ detail: 'Failed to check for updates' });
+    }
+});
 // GET /:tender_id - Get tender detail
 // GET /facets - Category (sector) and region counts for the Tenders page filters.
 // Must be registered before '/:tender_id' so "facets" isn't taken as an id.

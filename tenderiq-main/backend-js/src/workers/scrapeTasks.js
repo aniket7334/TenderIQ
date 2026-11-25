@@ -4,6 +4,8 @@ exports.scrapeSource = scrapeSource;
 exports.scrapeAllSources = scrapeAllSources;
 exports.cleanupOldRuns = cleanupOldRuns;
 exports.closeStaleRuns = closeStaleRuns;
+exports.syncGem = syncGem;
+exports.getGemSyncStatus = getGemSyncStatus;
 const { pool } = require('../db');
 const { v4: uuidv4 } = require('uuid');
 const { getAdapter } = require("../scrapers/adapters");
@@ -65,6 +67,7 @@ async function closeStaleRuns(sourceId) {
  * opts.full     — ignore the "stop at bids older than the last run" shortcut
  *                 (used for the first full GeM import).
  * opts.maxPages — override how many listing pages to read.
+ * opts.marginMinutes — how far before the last run to re-check (default 120).
  */
 async function scrapeSource(sourceId, opts = {}) {
     const [sourceRows] = await pool.execute(
@@ -96,6 +99,7 @@ async function scrapeSource(sourceId, opts = {}) {
     let tendersFound = 0;
     let tendersNew = 0;
     let tendersSkipped = 0;
+    let timedOut = false;
     try {
         const adapterConfig = typeof source.config === 'string' ? JSON.parse(source.config) : source.config;
         const adapter = getAdapter(source.adapter_type || 'generic', source.base_url, adapterConfig);
@@ -103,12 +107,19 @@ async function scrapeSource(sourceId, opts = {}) {
         // Adapters can opt in to larger crawls (GeM: thousands of pages)
         const maxPages = opts.maxPages || adapter.maxPages || 5;
         // Incremental runs: listings come newest-first, so stop once a whole page
-        // is older than the previous run (minus a 2h safety margin).
+        // is older than the previous run (minus a safety margin, 2h by default).
+        const marginMs = (opts.marginMinutes ?? 120) * 60 * 1000;
         const cutoff = adapter.incrementalByDate && !opts.full && source.last_scraped_at
-            ? new Date(new Date(source.last_scraped_at).getTime() - 2 * 60 * 60 * 1000)
+            ? new Date(new Date(source.last_scraped_at).getTime() - marginMs)
             : null;
 
+        const deadline = opts.maxMinutes ? Date.now() + opts.maxMinutes * 60 * 1000 : Infinity;
         for (let page = 1; page <= maxPages; page++) {
+            if (Date.now() > deadline) {
+                console.log(`[Scrape] ${source.name}: time limit (${opts.maxMinutes} min) reached at page ${page}; the next run continues`);
+                timedOut = true;
+                break;
+            }
             if (page > 1 && adapter.pageDelayMs)
                 await sleep(adapter.pageDelayMs);
             let listings = await adapter.fetchListings(page);
@@ -119,7 +130,10 @@ async function scrapeSource(sourceId, opts = {}) {
             }
             if (!listings.length) break;
             tendersFound += listings.length;
-            const pageIsOld = cutoff && listings.every((l) => l.issueDate && new Date(l.issueDate) < cutoff);
+            const skew = adapter.listingDateSkewMs || 0;
+            // Undated listings can't tell us anything, so judge the page by the dated ones
+            const dated = listings.filter((l) => l.issueDate && !Number.isNaN(new Date(l.issueDate).getTime()));
+            const pageIsOld = !!cutoff && dated.length > 0 && dated.every((l) => new Date(l.issueDate).getTime() - skew < cutoff.getTime());
 
             for (const listing of listings) {
                 // Deduplicate by reference_no + source
@@ -242,10 +256,13 @@ async function scrapeSource(sourceId, opts = {}) {
             'UPDATE scrape_runs SET status = ?, tenders_found = ?, tenders_new = ?, completed_at = NOW() WHERE id = ?',
             ['completed', tendersFound, tendersNew, runId]
         );
-        await pool.execute(
-            'UPDATE tender_sources SET last_scraped_at = NOW() WHERE id = ?',
-            [sourceId]
-        );
+        // A run cut short didn't reach the previous run's bids, so don't move
+        // the "caught up to" mark (the next run re-reads from the same point)
+        if (!timedOut)
+            await pool.execute(
+                'UPDATE tender_sources SET last_scraped_at = NOW() WHERE id = ?',
+                [sourceId]
+            );
     }
     catch (err) {
         await pool.execute(
@@ -268,6 +285,45 @@ async function scrapeAllSources() {
             console.error(`Failed to scrape source ${source.name}:`, err);
         }
     }
+}
+
+/**
+ * Live GeM sync: fetch only bids published since the last run (newest-first,
+ * stops at older pages). Runs every few minutes; skips if one is still going.
+ */
+async function syncGem() {
+    const [sources] = await pool.execute(
+        "SELECT id, name FROM tender_sources WHERE adapter_type = 'gem' AND is_active = 1"
+    );
+    for (const s of sources) {
+        try {
+            // Frequent runs only need a short overlap; the hourly scrape re-checks 2h
+            await scrapeSource(s.id, { marginMinutes: 10, maxMinutes: 4 });
+        }
+        catch (err) {
+            console.error(`[GeM sync] ${s.name} failed:`, err.message);
+        }
+    }
+}
+
+/** Latest GeM sync result, for the "Live" indicator and /health. */
+async function getGemSyncStatus() {
+    const [rows] = await pool.execute(
+        `SELECT r.status, r.started_at, r.completed_at, r.tenders_new, r.error_log
+           FROM scrape_runs r JOIN tender_sources s ON s.id = r.source_id
+          WHERE s.adapter_type = 'gem'
+          ORDER BY r.started_at DESC LIMIT 5`
+    );
+    const last = rows[0];
+    const lastOk = rows.find((r) => r.status === 'completed');
+    return {
+        running: last?.status === 'running',
+        last_status: last?.status || null,
+        last_run_at: last?.started_at || null,
+        last_success_at: lastOk?.completed_at || null,
+        last_new: lastOk ? Number(lastOk.tenders_new || 0) : null,
+        last_error: last?.status === 'failed' ? String(last.error_log || '').slice(0, 200) : null,
+    };
 }
 
 async function cleanupOldRuns() {

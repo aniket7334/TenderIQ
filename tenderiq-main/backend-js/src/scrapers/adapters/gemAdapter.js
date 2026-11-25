@@ -62,6 +62,9 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
     // GeM has ~40k live bids (10 per page): allow a full crawl, newest first.
     maxPages = 5000;
     incrementalByDate = true;
+    // GeM's listing dates are Indian time (IST) but marked as UTC, so they read
+    // 5h30m too new. Used only when deciding where an incremental run can stop.
+    listingDateSkewMs = 5.5 * 60 * 60 * 1000;
     // Only keep GeM bids that fall into one of TenderIQ's categories.
     requireCategory = true;
     retryOnEmpty = true;
@@ -70,6 +73,11 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
         const result = await this.trySearchApi(page);
         if (result.length > 0)
             return result;
+        // The fallbacks below can only read the first page of all-bids (they
+        // ignore the page number), so past page 1 they'd return page 1 again and
+        // a run would never finish. Report the page as empty instead.
+        if (page > 1)
+            return [];
         // Strategy 2: Try scraping the all-bids HTML page
         const result2 = await this.tryScrapeHtml(page);
         if (result2.length > 0)

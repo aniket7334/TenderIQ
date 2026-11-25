@@ -48,6 +48,7 @@ app.get('/health', async (_req, res) => {
             uptime: process.uptime(),
             timestamp: new Date().toISOString(),
             database: 'connected',
+            gem_sync: await require('./src/workers/scrapeTasks').getGemSyncStatus().catch(() => null),
         });
     }
     catch {
@@ -71,6 +72,16 @@ const server = app.listen(port, () => {
     console.log(`TenderIQ API server running on http://localhost:${port}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     (0, scheduler_1.startScheduler)();
+    // Render's free plan sleeps after 15 minutes without requests, which would
+    // also stop the GeM sync. Ping our own public URL so the server stays awake.
+    // (RENDER_EXTERNAL_URL is set by Render automatically; not set locally.)
+    const selfUrl = process.env.RENDER_EXTERNAL_URL;
+    if (selfUrl && process.env.KEEP_AWAKE !== 'false') {
+        setInterval(() => {
+            fetch(`${selfUrl}/health`).catch((err) => console.warn('[Keep-awake] ping failed:', err.message));
+        }, 10 * 60 * 1000).unref();
+        console.log(`[Keep-awake] pinging ${selfUrl}/health every 10 minutes`);
+    }
 });
 
 // ─── Graceful Shutdown ──────────────────────────────────

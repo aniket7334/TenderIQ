@@ -18,6 +18,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { formatCurrency, formatDate, getStatusLabel } from '@/lib/utils';
+import { useLiveTenders } from '@/hooks/useLiveTenders';
+import { LiveStatus } from '@/components/ui/live-status';
 
 /* Classic & simple: white cards, navy text, grey details. No status colours —
    urgency is shown with words ("Today", "2 days left") and weight, not red. */
@@ -89,9 +91,10 @@ export default function DashboardPage() {
   const [scrapingGem, setScrapingGem] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchDashboard = useCallback(async () => {
+  // silent: refresh in place (live updates) without the full-page spinner
+  const fetchDashboard = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (silent !== true) setLoading(true);
       setError(null);
       const [statsRes, tendersRes] = await Promise.all([
         api.get('/admin/dashboard'),
@@ -112,12 +115,18 @@ export default function DashboardPage() {
     fetchDashboard();
   }, [fetchDashboard]);
 
+  // Live: when new GeM tenders arrive, update the numbers and lists by themselves
+  const { sync } = useLiveTenders((count) => {
+    fetchDashboard(true);
+    toast.success(`${count.toLocaleString()} new tender${count === 1 ? '' : 's'} added`, { id: 'live-new' });
+  });
+
   const handleScrapeNow = async () => {
     try {
       setScraping(true);
       await api.post('/sources/scrape-all');
       toast.success('Fetching new tenders from all sources');
-      await fetchDashboard();
+      await fetchDashboard(true);
     } catch {
       // the API helper already reports errors
     } finally {
@@ -131,7 +140,7 @@ export default function DashboardPage() {
       setScrapingGem(true);
       const res = await api.post('/sources/scrape-type/gem');
       toast.success(res.data?.message || 'Fetching the latest GeM tenders');
-      setTimeout(() => fetchDashboard(), 30000);
+      setTimeout(() => fetchDashboard(true), 30000);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not start the GeM scrape';
       if (/already being scraped/i.test(message)) toast(message, { icon: '⏳' });
@@ -182,9 +191,10 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">Overview of your tender pipeline</p>
+          <LiveStatus sync={sync} className="mt-2" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={fetchDashboard} variant="outline" size="md" title="Reload the numbers on this page (does not fetch new tenders)">
+          <Button onClick={() => fetchDashboard(true)} variant="outline" size="md" title="Reload the numbers on this page (does not fetch new tenders)">
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>

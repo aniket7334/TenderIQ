@@ -22,6 +22,9 @@ import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
 import { ALL_COUNTRIES, INTERNATIONAL_REGIONS } from '@/lib/countries';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
+import toast from 'react-hot-toast';
+import { useLiveTenders } from '@/hooks/useLiveTenders';
+import { LiveStatus } from '@/components/ui/live-status';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -190,9 +193,10 @@ function TendersPageContent() {
     setFilters((prev) => (prev.search === urlSearch ? prev : { ...prev, search: urlSearch, page: 1 }));
   }, [urlSearch]);
 
-  const fetchTenders = useCallback(async () => {
+  // silent: refresh the list in place (live updates) without the loading state
+  const fetchTenders = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (silent !== true) setLoading(true);
       setError(null);
       const params = {};
       if (filters.search) params.search = filters.search;
@@ -244,6 +248,13 @@ function TendersPageContent() {
   useEffect(() => {
     fetchTenders();
   }, [fetchTenders]);
+
+  // Live: new GeM tenders show up in the list by themselves
+  const { sync } = useLiveTenders((count) => {
+    fetchTenders(true);
+    fetchFacets();
+    toast.success(`${count.toLocaleString()} new tender${count === 1 ? '' : 's'} added`, { id: 'live-new' });
+  });
 
   useEffect(() => {
     fetchSources();
@@ -404,6 +415,7 @@ function TendersPageContent() {
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Global Tenders</h1>
+          <LiveStatus sync={sync} className="mt-1" />
         </div>
       </div>
 
