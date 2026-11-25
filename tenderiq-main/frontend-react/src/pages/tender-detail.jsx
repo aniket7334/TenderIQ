@@ -94,12 +94,28 @@ export default function TenderDetailPage() {
     async (refresh = false) => {
       try {
         refresh ? setDocsRefreshing(true) : setDocsLoading(true);
-        const res = await api.get(`/tenders/${id}/documents`, { params: refresh ? { refresh: 1 } : {} });
+        // Generous timeout: the free API server may need ~50s to wake up, and
+        // the first view also downloads the bid document from GeM.
+        const load = () =>
+          api.get(`/tenders/${id}/documents`, { params: refresh ? { refresh: 1 } : {}, timeout: 90000 });
+        let res;
+        try {
+          res = await load();
+        } catch (first) {
+          // A dropped connection (server waking up / restarting) — try once more
+          if (!/network error|timeout/i.test(first?.message || '')) throw first;
+          await new Promise((r) => setTimeout(r, 3000));
+          res = await load();
+        }
         const data = res.data || {};
         setDocBundle(data);
         setDocuments(data.items || (Array.isArray(data) ? data : []));
       } catch (err) {
-        setDocBundle((prev) => ({ ...(prev || {}), fetch_error: err instanceof Error ? err.message : 'Could not load documents' }));
+        const raw = err instanceof Error ? err.message : '';
+        const message = /network error|timeout/i.test(raw)
+          ? "Couldn't reach the TenderIQ server. It may be starting up — wait a few seconds and click Refresh."
+          : raw || 'Could not load documents';
+        setDocBundle((prev) => ({ ...(prev || {}), fetch_error: message }));
       } finally {
         setDocsLoading(false);
         setDocsRefreshing(false);

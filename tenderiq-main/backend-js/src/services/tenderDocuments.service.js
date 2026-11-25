@@ -19,6 +19,10 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
 // Re-fetch from the source after this long (corrigenda can add documents)
 const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
+// Answer the Documents request within this time even if GeM is still loading
+const RESPOND_WITHIN_MS = 20 * 1000;
+// One GeM fetch per tender at a time (repeat clicks share it)
+const inFlight = new Map();
 
 const ETENDERS_SEARCH_URL = 'https://etenders.gov.in/eprocure/app?page=FrontEndAdvancedSearch&service=page';
 
@@ -237,12 +241,30 @@ async function getDocumentsBundle(tenderId, { refresh = false } = {}) {
     let fetchError = null;
     const stale = !tender.docs_fetched_at || Date.now() - new Date(tender.docs_fetched_at).getTime() > REFRESH_AFTER_MS;
     if (isGem && (refresh || stale)) {
+        // Never hold the request hostage to GeM: if it's slow, answer with what
+        // we already have and let the fetch finish in the background.
+        let job = inFlight.get(tender.id);
+        if (!job) {
+            job = fetchGemDocuments(tender).finally(() => inFlight.delete(tender.id));
+            inFlight.set(tender.id, job);
+        }
+        let timer;
         try {
-            await fetchGemDocuments(tender);
+            const finished = await Promise.race([
+                job.then(() => true),
+                new Promise((resolve) => { timer = setTimeout(() => resolve(false), RESPOND_WITHIN_MS); }),
+            ]);
+            if (!finished) {
+                job.catch((err) => console.error(`[Documents] GeM fetch failed for ${tender.reference_no}:`, err.message));
+                fetchError = 'GeM is responding slowly. The bid document is still loading — click Refresh in a minute.';
+            }
         }
         catch (err) {
             fetchError = err instanceof AppError ? err.message : `Couldn't reach GeM right now (${err.code || err.message}). Try again shortly.`;
             console.error(`[Documents] GeM fetch failed for ${tender.reference_no}:`, err.message);
+        }
+        finally {
+            clearTimeout(timer);
         }
     }
 
