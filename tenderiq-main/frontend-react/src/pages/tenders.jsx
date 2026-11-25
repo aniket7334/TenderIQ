@@ -168,6 +168,8 @@ function TendersPageContent() {
   const [error, setError] = useState(null);
   const [sources, setSources] = useState([]);
   const [regionFacets, setRegionFacets] = useState([]);
+  // Live count of open Europe tenders (TED) — counted, not stored
+  const [europeTotal, setEuropeTotal] = useState(null);
   const [sectorFacets, setSectorFacets] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -249,6 +251,7 @@ function TendersPageContent() {
     try {
       const res = await api.get('/tenders/facets');
       setRegionFacets(res.data.regions || []);
+      setEuropeTotal(res.data.europe_total ?? null);
       setSectorFacets(res.data.sectors || []);
     } catch {
       // non-critical — dropdowns fall back to hardcoded lists
@@ -542,7 +545,9 @@ function TendersPageContent() {
                 </optgroup>
               )}
               <optgroup label="Europe — live from TED">
-                <option value={EUROPE}>🇪🇺 All Europe</option>
+                <option value={EUROPE}>
+                  🇪🇺 All Europe{europeTotal != null ? ` (${europeTotal.toLocaleString()})` : ''}
+                </option>
                 {EUROPE_COUNTRY_NAMES.map((name) => {
                   const opt = ALL_COUNTRIES.find((c) => c.value === name);
                   return (
@@ -581,14 +586,19 @@ function TendersPageContent() {
               className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="">
-                {europeMode ? 'Marine, dredging & pipelines' : 'All Categories'}
+                {europeMode
+                  ? `Marine, dredging & pipelines${!selectedCategory && !loading ? ` (${total.toLocaleString()})` : ''}`
+                  : 'All Categories'}
                 {!europeMode && sectorFacets.length > 0 &&
                   ` (${sectorFacets.reduce((s, x) => s + x.count, 0)})`}
               </option>
               {sectorFacets.length > 0
                 ? sectorFacets.map((s) => (
                     <option key={s.sector} value={s.sector}>
-                      {s.sector}{europeMode ? '' : ` (${s.count})`}
+                      {s.sector}
+                      {europeMode
+                        ? selectedCategory === s.sector && !loading ? ` (${total.toLocaleString()})` : ''
+                        : ` (${s.count})`}
                     </option>
                   ))
                 : CATEGORY_OPTIONS.slice(1).map((cat) => (

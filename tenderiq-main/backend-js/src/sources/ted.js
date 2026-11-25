@@ -364,9 +364,21 @@ async function getDocuments(id) {
 
 const isLiveId = (id) => String(id || '').startsWith(ID_PREFIX);
 
+/**
+ * How many open tenders the default Europe view has (All Europe, dredging /
+ * marine / pipeline / shipping group). Asked live (TED returns the count with
+ * every search), cached like any TED answer. Never waits longer than
+ * `waitMs` — totals must not slow the Dashboard down; null if unknown.
+ */
+async function countEurope({ waitMs = 6000 } = {}) {
+    const query = searchTenders({ region: EUROPE, page: 1, pageSize: 1 }).then((r) => r.total).catch(() => null);
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), waitMs));
+    return Promise.race([query, timeout]);
+}
+
 module.exports = {
     EUROPE, EUROPE_COUNTRIES, isEuropeRegion, isLiveId,
-    searchTenders, getTender, getDocuments,
+    searchTenders, getTender, getDocuments, countEurope,
     // for tests
     categoriesFromCpv, categoryClause, tedDate,
 };

@@ -166,7 +166,7 @@ Base path: **`/api/v1`**. All routes except auth and `/health` need a `Authoriza
 |---|---|---|
 | GET | `/` | List with filters (`search`, `internal_status`, `source_id`, `category`, `country`, `min_value`, `max_value`, `date_from`, `date_to`), paging (`page`, `page_size`), sort (`sort_by`, `sort_order`) and **`priority_first=1`**. **`country=Europe` or a European country → live from TED** (also `city`, `category`, `search`, `page`, `sort_by`); response adds `live_source: "TED"` |
 | GET | `/updates?since=ISO` | New-tender count since a time + GeM sync status (polled by pages every minute) |
-| GET | `/facets` | Category and region counts for filter dropdowns |
+| GET | `/facets` | Category and region counts for filter dropdowns, plus `europe_total` (live count of open Europe tenders from TED, not stored) |
 | GET | `/:id` | Tender detail. Ids starting `ted-` (e.g. `ted-766488-2026`) are read live from TED and include `how_to_apply` (deadline, procedure, submission/documents links, buyer contact) |
 | PATCH | `/:id` | Update (status/shortlist, assignee, fields) |
 | POST | `/:id/shortlist` | Toggle shortlist flag |
@@ -188,7 +188,7 @@ Changes to `ted-` tenders (shortlist, tags, comments, edits) are refused with a 
 - `/keywords` — keyword CRUD, bulk add, test matching
 - `/templates` — tender-note templates (upload Word templates, placeholders)
 - `/tender-notes` — generate AI notes for a tender, edit, export
-- `/admin` — `GET /dashboard` (stats, upcoming deadlines, monthly trend), `GET /audit-logs`, user management (`/users`, roles)
+- `/admin` — `GET /dashboard` (stats, upcoming deadlines, monthly trend; `europe_live_total` = live TED count added to Total tenders, `stored_tenders` = India tenders in the database), `GET /audit-logs`, user management (`/users`, roles)
 - Extra routes in `routes/index.js`: `/dashboard`, `/extract-costs`, `/tenders/:id/infographic`, `/live-tenders`, `/live-tenders/import`
 
 ### Scheduler (`src/workers/scheduler.js`)
@@ -264,6 +264,8 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 
 **Detail & how to apply:** procedure, lot titles/descriptions (buyer's language), submission URL, documents URL, buyer email/phone/address/website, English notice PDF (`ted.europa.eu/en/notice/<id>/pdf`) and notice page.
 
+**Totals without storage:** TED returns the number of matching notices with every search, so counts are asked live (cached 10 minutes, never more than 6 s of waiting): the Dashboard's **Total tenders** = India tenders (stored) + Europe tenders (live), shown as "India N · Europe N (live)"; the Region dropdown shows **All Europe (N)** and the Sector field shows the live total for the Europe view or the chosen sector (e.g. Pipeline (312)).
+
 **Limits:** TED rate-limits busy clients (HTTP 429) — answers are cached in memory for 10 minutes and retried briefly. Europe tenders can't be shortlisted, tagged, commented or counted on the Dashboard (that needs storage). The UK is not on TED since Brexit (planned next: Find a Tender).
 
 ---
@@ -298,7 +300,7 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 | Page | What it does |
 |---|---|
 | **Sign in / Create account** | Premium two-panel sign-in & registration. Demo quick-login buttons appear **only in local development** (compiled out of production builds). |
-| **Dashboard** | Classic cards: Total tenders (+ added today), Shortlisted, Pending review, Closing soon. Upcoming deadlines (priority first, "Today / N days left"), Tenders per month chart, **5 recent tenders** (priority first). Buttons: Refresh, **GeM Now** (fetch newest GeM bids), **Scrape Now** (all sources). Live label + auto refresh. |
+| **Dashboard** | Classic cards: Total tenders (India stored + Europe live from TED, with the breakdown; + added today), Shortlisted, Pending review, Closing soon. Upcoming deadlines (priority first, "Today / N days left"), Tenders per month chart, **5 recent tenders** (priority first). Buttons: Refresh, **GeM Now** (fetch newest GeM bids), **Scrape Now** (all sources). Live label + auto refresh. |
 | **Tenders** | Full list with advanced filters (region — all countries, sector/category, value range, dates, status, source), density options, columns, CSV export, sorting, paging; **star to shortlist / unshortlist**; priority tenders first; live auto refresh. **Region → "Europe — live from TED"** (All Europe or one of 31 countries) shows Europe's open tenders live, with a **City** filter and a "Live from TED" note; rows show city, country, "Live" and "TED (EU)". |
 | **Tender detail** | Overview, **Documents**, Notes, History tabs; shortlist, download, fetch from source, infographic, tags, assignee, comments. **Europe (TED) tenders:** Overview, Documents (notice PDF + buyer's documents/submission links) and **How to apply** (deadline, Submit online, steps, buyer contact); shortlist/notes/history hidden because nothing is stored. |
 | **Shortlisted** | All shortlisted tenders with value and days left; sort (closing soonest / newest / highest value); remove from shortlist; paging. |
@@ -485,6 +487,7 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 23. **Priority tenders first** — dredging, marine construction, pipelines, shipping & vessels at the top of the Tenders list and Dashboard; new **Pipeline** category.
 24. **Project documentation** — this file; kept up to date with every change.
 25. **Europe tenders, live from TED** — Region filter gets "Europe — live from TED" (All Europe + 31 countries) and a City filter; the Tenders tab and tender page show TED tenders live with Documents and **How to apply**, **nothing stored**; categories mapped to CPV codes; opens on the marine/dredging/pipeline group.
+26. **Europe totals without storage** — Dashboard Total tenders includes the live Europe count ("India · Europe (live)"); Region shows All Europe (N) and Sector shows the live total for the Europe view / chosen sector.
 
 ---
 

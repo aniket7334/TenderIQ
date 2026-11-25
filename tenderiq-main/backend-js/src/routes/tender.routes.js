@@ -143,6 +143,8 @@ router.get('/facets', auth_1.authenticate, async (_req, res) => {
         res.json({
             sectors: sectors.map((r) => ({ sector: r.sector, count: Number(r.count) })),
             regions: india.count ? [{ country: 'India', count: Number(india.count) }] : [],
+            // Live count for "All Europe" (TED, not stored); null if TED didn't answer in time
+            europe_total: await ted.countEurope(),
         });
     }
     catch (err) {

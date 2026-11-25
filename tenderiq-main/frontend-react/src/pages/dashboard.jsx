@@ -221,12 +221,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Key numbers */}
+      {/* Key numbers — Total = India tenders (stored) + Europe tenders counted live from TED (not stored) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total tenders"
-          value={stats?.total_tenders ?? 0}
-          note={`${(stats?.new_today ?? 0).toLocaleString()} added today`}
+          value={(stats?.total_tenders ?? 0) + (stats?.europe_live_total ?? 0)}
+          note={
+            stats?.europe_live_total != null
+              ? `India ${(stats?.total_tenders ?? 0).toLocaleString()} · Europe ${stats.europe_live_total.toLocaleString()} (live) · ${(stats?.new_today ?? 0).toLocaleString()} added today`
+              : `${(stats?.new_today ?? 0).toLocaleString()} added today`
+          }
           icon={FolderOpen}
           to="/tenders"
         />
