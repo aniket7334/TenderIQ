@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// The live API (Render). VITE_API_URL overrides it — local development sets it
+// to http://localhost:8000/api/v1 in .env. This address is public, not a secret.
+const DEFAULT_API_URL = 'https://tenderiq-api-emx0.onrender.com/api/v1';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://10deriq.com/api/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || DEFAULT_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
