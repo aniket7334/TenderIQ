@@ -10,7 +10,8 @@
     "import:gem": "node scripts/import-gem.js",
     "copy-data": "node scripts/copy-data.js",
     "make-admin": "node scripts/make-admin.js",
-    "db-check": "node scripts/db-check.js"
+    "db-check": "node scripts/db-check.js",
+    "set-password": "node scripts/set-password.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
