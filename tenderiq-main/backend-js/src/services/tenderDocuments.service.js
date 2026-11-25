@@ -10,6 +10,7 @@
  */
 const axiosModule = require('axios');
 const axios = axiosModule.default || axiosModule;
+const { gemHttp } = require('../scrapers/gemHttp');
 const pdfParse = require('pdf-parse');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../db');
@@ -154,7 +155,7 @@ async function parseGemBidPdf(buffer) {
 /* ------------------------------------------------------------------ */
 
 async function fetchGemDocuments(tender) {
-    const res = await axios.get(tender.source_url, {
+    const res = await gemHttp.get(tender.source_url, {
         responseType: 'arraybuffer',
         headers: { 'User-Agent': UA, Accept: 'application/pdf,*/*' },
         timeout: 30000,

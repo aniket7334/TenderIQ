@@ -47,3 +47,10 @@ services:
         value: openai
       - key: OPENAI_API_KEY
         sync: false
+      # GeM refuses Render's servers, so GeM requests go through the relay
+      # function on Vercel (Mumbai). Set GEM_PROXY_KEY to the same random value
+      # here and in Vercel's environment variables.
+      - key: GEM_PROXY_URL
+        value: https://tenderiq-theta.vercel.app/api/gem-proxy
+      - key: GEM_PROXY_KEY
+        sync: false

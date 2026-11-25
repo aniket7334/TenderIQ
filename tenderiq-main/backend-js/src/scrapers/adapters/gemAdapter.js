@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GemAdapter = void 0;
 const axios_1 = __importDefault(require("axios"));
+const { gemHttp } = require("../gemHttp");
 const cheerio = __importStar(require("cheerio"));
 const baseAdapter_1 = require("../base/baseAdapter");
 const currencyNormalizer_1 = require("../normalizers/currencyNormalizer");
@@ -187,7 +188,7 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
     async getSession(forceRefresh = false) {
         if (!forceRefresh && this.session && Date.now() - this.session.at < 10 * 60 * 1000)
             return this.session;
-        const sessionRes = await axios_1.default.get('https://bidplus.gem.gov.in/all-bids', {
+        const sessionRes = await gemHttp.get('https://bidplus.gem.gov.in/all-bids', {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml',
@@ -220,7 +221,7 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
                 }),
                 ...(csrfToken ? { csrf_bd_gem_nk: csrfToken } : {}),
             });
-            const post = (ck) => axios_1.default.post('https://bidplus.gem.gov.in/all-bids-data', payload.toString(), {
+            const post = (ck) => gemHttp.post('https://bidplus.gem.gov.in/all-bids-data', payload.toString(), {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -271,7 +272,7 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
     async tryScrapeHtml(page) {
         try {
             console.log(`[GeM] Strategy 2: Trying HTML scrape page ${page}...`);
-            const response = await axios_1.default.get('https://bidplus.gem.gov.in/all-bids', {
+            const response = await gemHttp.get('https://bidplus.gem.gov.in/all-bids', {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 },
@@ -339,7 +340,7 @@ class GemAdapter extends baseAdapter_1.BaseAdapter {
     }
     async fetchDetail(url) {
         try {
-            const response = await axios_1.default.get(url, {
+            const response = await gemHttp.get(url, {
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
                 timeout: 15000,
             });
