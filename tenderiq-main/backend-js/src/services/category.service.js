@@ -32,7 +32,8 @@ const CATEGORY_RULES = [
   { keywords: ["railway", "rail ", "siding", "track "], category: "Railway", color: "red" },
   { keywords: ["building", "construction", "civil work"], category: "Construction", color: "orange" },
   { keywords: ["electrical", "power", "transformer", "substation"], category: "Electrical", color: "yellow" },
-  { keywords: ["water supply", "pipeline", "plumbing", "drainage", "sewage"], category: "Water/Plumbing", color: "blue" },
+  { keywords: ["pipeline", "pipe line", "pipe laying", "pipelaying", "laying of pipe", "subsea pipe"], category: "Pipeline", color: "slate" },
+  { keywords: ["water supply", "plumbing", "drainage", "sewage"], category: "Water/Plumbing", color: "blue" },
   { keywords: ["maintenance", "repair", "renovation", "restoration"], category: "Maintenance", color: "green" },
   { keywords: ["security", "surveillance", "cctv", "guard"], category: "Security", color: "red" },
   { keywords: ["software", "it ", "computer", "digital", "website", "application"], category: "IT/Software", color: "violet" },
@@ -94,7 +95,18 @@ function getCategoryString(text) {
   return matches.map((m) => m.category).join(", ");
 }
 
+/**
+ * First-priority categories (dredging, marine works, pipelines, shipping &
+ * vessels): their tenders are listed first. See priority.service.js.
+ */
+const PRIORITY_CATEGORIES = [
+  "Dredging", "Port", "Jetty", "Wharf", "Breakwater", "Harbour", "Berth", "Dock",
+  "Maritime", "Coastal", "Waterway", "Navigation", "Pipeline",
+  "Shipping", "Cargo", "Vessel", "Tugboat", "Shipbuilding", "Ship Repair", "Lighthouse",
+];
+
 module.exports = {
+  PRIORITY_CATEGORIES,
   detectCategories,
   getPrimaryCategory,
   getCategoryString,

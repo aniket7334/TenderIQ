@@ -213,6 +213,8 @@ function TendersPageContent() {
       params.page_size = filters.page_size || 20;
       if (filters.sort_by) params.sort_by = filters.sort_by;
       if (filters.sort_order) params.sort_order = filters.sort_order;
+      // Dredging, marine, pipeline and shipping tenders first, then the chosen order
+      params.priority_first = 1;
 
       const res = await api.get('/tenders', { params });
       setTenders(res.data.items);

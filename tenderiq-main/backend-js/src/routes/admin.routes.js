@@ -63,7 +63,7 @@ router.get('/dashboard', async (_req, res) => {
                     s.name as source_name
              FROM tenders t LEFT JOIN tender_sources s ON t.source_id = s.id
              WHERE t.submission_end_date >= ?
-             ORDER BY t.submission_end_date ASC LIMIT 10`, [now]
+             ORDER BY ${require('../services/priority.service').isPriorityReady() ? 't.is_priority DESC, ' : ''}t.submission_end_date ASC LIMIT 10`, [now]
         );
 
         const [recentRuns] = await pool.execute(

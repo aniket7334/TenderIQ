@@ -99,7 +99,7 @@ export default function DashboardPage() {
       const [statsRes, tendersRes] = await Promise.all([
         api.get('/admin/dashboard'),
         api.get('/tenders', {
-          params: { page: 1, page_size: RECENT_LIMIT, sort_by: 'created_at', sort_order: 'desc' },
+          params: { page: 1, page_size: RECENT_LIMIT, sort_by: 'created_at', sort_order: 'desc', priority_first: 1 },
         }),
       ]);
       setStats(statsRes.data);
@@ -257,7 +257,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel
           title="Upcoming deadlines"
-          subtitle="The next tenders to close"
+          subtitle="Next to close — priority categories first"
           action={<ViewAll to="/tenders?sort_by=submission_deadline&sort_order=asc" />}
         >
           {deadlines.length ? (
@@ -312,7 +312,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent tenders (latest 5) */}
-      <Panel title="Recent tenders" subtitle={`Latest ${RECENT_LIMIT} added`} action={<ViewAll to="/tenders" />}>
+      <Panel title="Recent tenders" subtitle={`Latest ${RECENT_LIMIT} — dredging, marine & pipeline tenders first`} action={<ViewAll to="/tenders" />}>
         {recentTenders.length === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-gray-500">No tenders yet. Click "Scrape Now" to fetch them.</p>
         ) : (

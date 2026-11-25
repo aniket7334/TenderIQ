@@ -13,6 +13,10 @@ const { extractAllPending } = require("./extractionTasks");
 function startScheduler() {
     console.log('Starting task scheduler...');
 
+    // Priority flag (dredging / marine / pipeline tenders first): create the
+    // column if needed and compute flags right away (Render doesn't run migrate.js)
+    require('../services/priority.service').initPriority();
+
     // Scrape all active sources every 1 hour to check for new tenders
     cron.schedule('0 * * * *', async () => {
         console.log('[Scheduler] Running hourly scrape for new tenders...');
@@ -54,6 +58,12 @@ function startScheduler() {
         catch (err) {
             console.error('[Scheduler] New-tender alerts failed:', err);
         }
+    });
+
+    // Re-check every tender's priority flag hourly (covers tags edited elsewhere)
+    cron.schedule('20 * * * *', () => {
+        require('../services/priority.service').refreshPriority()
+            .catch((err) => console.error('[Scheduler] Priority refresh failed:', err.message));
     });
 
     // Check upcoming deadlines daily at 8 AM

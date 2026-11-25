@@ -43,7 +43,7 @@ const router = (0, express_1.Router)();
 // GET / - List tenders
 router.get('/', auth_1.authenticate, async (req, res) => {
     try {
-        const { search, status, internal_status, source_id, location, country, category, min_value, max_value, date_from, date_to, is_shortlisted, page, page_size, sort_by, sort_order, } = req.query;
+        const { search, status, internal_status, source_id, location, country, category, min_value, max_value, date_from, date_to, is_shortlisted, page, page_size, sort_by, sort_order, priority_first, } = req.query;
         const result = await tenderService.listTenders({
             search: search,
             status: status,
@@ -65,6 +65,7 @@ router.get('/', auth_1.authenticate, async (req, res) => {
             page_size: page_size ? Number(page_size) : 20,
             sortBy: sort_by,
             sortOrder: sort_order,
+            priorityFirst: priority_first === '1' || priority_first === 'true',
         });
         res.json(result);
     }

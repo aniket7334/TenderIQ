@@ -208,6 +208,9 @@ async function listTenders(params) {
         ? SORT_COLUMN_MAP[params.sortBy]
         : 'created_at';
     const sortOrder = params.sortOrder === 'asc' ? 'ASC' : 'DESC';
+    // Priority categories (dredging, marine, pipelines…) first, then the chosen sort
+    const { isPriorityReady } = require('./priority.service');
+    const priorityFirst = params.priorityFirst && isPriorityReady() ? 't.is_priority DESC, ' : '';
 
     // Count query
     const countSql = `SELECT COUNT(*) as total FROM tenders t ${whereClause}`;
@@ -222,13 +225,13 @@ async function listTenders(params) {
         FROM (
             SELECT t.id FROM tenders t ${params.sourceId ? '' : 'IGNORE INDEX (idx_tenders_source_ref)'}
             ${whereClause}
-            ORDER BY t.${sortField} ${sortOrder}, t.id ${sortOrder}
+            ORDER BY ${priorityFirst}t.${sortField} ${sortOrder}, t.id ${sortOrder}
             LIMIT ${parseInt(pageSize, 10)} OFFSET ${parseInt(offset, 10)}
         ) page
         JOIN tenders t ON t.id = page.id
         LEFT JOIN tender_sources ts ON t.source_id = ts.id
         LEFT JOIN users u ON t.assigned_to = u.id
-        ORDER BY t.${sortField} ${sortOrder}, t.id ${sortOrder}
+        ORDER BY ${priorityFirst}t.${sortField} ${sortOrder}, t.id ${sortOrder}
     `;
     const [items] = await pool.query(dataSql, queryParams);
 
@@ -421,6 +424,7 @@ async function addTag(tenderId, tagName) {
         [tagId, tenderId, tagName, now]
     );
 
+    await require('./priority.service').refreshPriority({ ids: [tenderId] });
     return { id: tagId, tender_id: tenderId, tag_name: tagName, created_at: now };
 }
 
@@ -437,6 +441,7 @@ async function removeTag(tenderId, tagName) {
         'DELETE FROM tender_tags WHERE tender_id = ? AND tag_name = ?',
         [tenderId, tagName]
     );
+    await require('./priority.service').refreshPriority({ ids: [tenderId] });
 }
 
 async function addComment(tenderId, userId, comment) {

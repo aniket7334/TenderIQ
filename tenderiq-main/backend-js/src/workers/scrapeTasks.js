@@ -91,6 +91,7 @@ async function scrapeSource(sourceId, opts = {}) {
     }
 
     const runId = uuidv4();
+    const runStartedAt = new Date(Date.now() - 60 * 1000);
     await pool.execute(
         'INSERT INTO scrape_runs (id, source_id, status, started_at, heartbeat_at) VALUES (?, ?, ?, NOW(), NOW())',
         [runId, sourceId, 'running']
@@ -258,6 +259,9 @@ async function scrapeSource(sourceId, opts = {}) {
             'UPDATE scrape_runs SET status = ?, tenders_found = ?, tenders_new = ?, error_log = ?, completed_at = NOW() WHERE id = ?',
             [emptyRun ? 'failed' : 'completed', tendersFound, tendersNew, emptyRun ? adapter.lastError : null, runId]
         );
+        // Flag new tenders in priority categories so they're listed first
+        await require('../services/priority.service').refreshPriority({ since: runStartedAt })
+            .catch((e) => console.error('[Priority] refresh failed:', e.message));
         if (emptyRun)
             console.warn(`[Scrape] ${source.name}: read nothing — ${adapter.lastError}`);
         // A run cut short didn't reach the previous run's bids, so don't move
