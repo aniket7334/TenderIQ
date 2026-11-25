@@ -23,6 +23,7 @@ import {
   HelpCircle,
   KeyRound,
   LifeBuoy,
+  Star,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -34,6 +35,7 @@ const navigation = [
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Tenders', href: '/tenders', icon: Search },
+      { label: 'Shortlisted', href: '/shortlisted', icon: Star },
       { label: 'Tender Notes', href: '/tender-notes', icon: FileText },
       { label: 'Alerts', href: '/alerts', icon: Bell },
     ],

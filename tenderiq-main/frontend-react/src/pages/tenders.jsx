@@ -277,11 +277,15 @@ function TendersPageContent() {
   const handleShortlist = async (tenderId, e) => {
     e.preventDefault();
     e.stopPropagation();
+    // Star toggles: shortlist, or remove from the shortlist if already starred
+    const current = tenders.find((t) => t.id === tenderId);
+    const next = current?.internal_status === 'interested' ? 'new' : 'interested';
     try {
-      await api.patch(`/tenders/${tenderId}`, { internal_status: 'interested' });
+      await api.patch(`/tenders/${tenderId}`, { internal_status: next });
       setTenders((prev) =>
-        prev.map((t) => (t.id === tenderId ? { ...t, internal_status: 'interested' } : t)),
+        prev.map((t) => (t.id === tenderId ? { ...t, internal_status: next } : t)),
       );
+      toast.success(next === 'interested' ? 'Added to Shortlisted' : 'Removed from Shortlisted', { id: 'shortlist' });
     } catch {
       // error handled by interceptor
     }
@@ -957,7 +961,7 @@ function TendersPageContent() {
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={(e) => handleShortlist(tender.id, e)}
-                              title="Shortlist tender"
+                              title={tender.internal_status === 'interested' ? 'Remove from shortlist' : 'Shortlist tender'}
                               className={`rounded-lg p-1.5 transition-colors ${
                                 tender.internal_status === 'interested'
                                   ? 'text-amber-500 hover:bg-amber-50'
@@ -1051,7 +1055,7 @@ function TendersPageContent() {
                       </button>
                       <button
                         onClick={(e) => handleShortlist(tender.id, e)}
-                        title="Shortlist tender"
+                        title={tender.internal_status === 'interested' ? 'Remove from shortlist' : 'Shortlist tender'}
                         className={`rounded-lg p-2 ${
                           tender.internal_status === 'interested'
                             ? 'text-amber-500 hover:bg-amber-50'

@@ -235,7 +235,7 @@ export default function DashboardPage() {
           value={stats?.tenders_by_status?.['interested'] ?? stats?.active_tenders ?? 0}
           note="Marked for follow-up"
           icon={Star}
-          to="/tenders?status=interested"
+          to="/shortlisted"
         />
         <StatCard
           label="Pending review"
