@@ -295,14 +295,14 @@ async function scrapeAllSources() {
  * Live GeM sync: fetch only bids published since the last run (newest-first,
  * stops at older pages). Runs every few minutes; skips if one is still going.
  */
-async function syncGem() {
+async function syncGem(opts = {}) {
     const [sources] = await pool.execute(
         "SELECT id, name FROM tender_sources WHERE adapter_type = 'gem' AND is_active = 1"
     );
     for (const s of sources) {
         try {
             // Frequent runs only need a short overlap; the hourly scrape re-checks 2h
-            await scrapeSource(s.id, { marginMinutes: 10, maxMinutes: 4 });
+            await scrapeSource(s.id, { marginMinutes: 10, maxMinutes: 4, ...opts });
         }
         catch (err) {
             console.error(`[GeM sync] ${s.name} failed:`, err.message);

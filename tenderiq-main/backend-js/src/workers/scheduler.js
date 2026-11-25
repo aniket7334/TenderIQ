@@ -38,7 +38,8 @@ function startScheduler() {
             await pool.execute(
                 "UPDATE scrape_runs SET status = 'failed', error_log = 'Interrupted (server restarted)', completed_at = NOW() WHERE status = 'running'"
             );
-            await syncGem();
+            // Look further back after a restart, to fill any gap while it was down
+            await syncGem({ marginMinutes: 8 * 60, maxMinutes: 25 });
         }
         catch (err) {
             console.error('[Scheduler] Startup GeM sync failed:', err);
