@@ -65,7 +65,7 @@ router.post('/register', async (req, res) => {
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });
@@ -96,7 +96,7 @@ router.post('/login', async (req, res) => {
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });
@@ -110,7 +110,7 @@ router.post('/refresh', async (req, res) => {
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });

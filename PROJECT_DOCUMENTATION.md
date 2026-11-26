@@ -148,7 +148,7 @@ Folders such as `frontend-react-backup-*` and `ci-test` at the repo root are loc
 
 ## 5. Tech stack
 
-**Backend** — Node.js 22, Express 4, mysql2 (promise pool), node-cron, axios, cheerio (HTML parsing), pdf-parse (GeM bid PDFs), bcryptjs + jsonwebtoken (auth), multer (uploads), docx / exceljs / mammoth (exports & templates), openai / @anthropic-ai/sdk (AI notes), nodemailer, puppeteer-core (optional browser fallback), zod.
+**Backend** — Node.js 22 (22.12 or newer — required by openai 7 and puppeteer-core 25), Express 4, mysql2 (promise pool), node-cron, axios, cheerio (HTML parsing), pdf-parse (GeM bid PDFs), bcryptjs + jsonwebtoken (auth), multer (uploads), docx / exceljs / mammoth (exports & templates), openai / @anthropic-ai/sdk (AI notes), nodemailer, puppeteer-core (optional browser fallback), zod.
 
 **Frontend** — React 18 (JSX), Vite 5, React Router 6, Tailwind CSS 3 (+ forms plugin), zustand (auth store), axios, recharts (charts), lucide-react (icons), react-hot-toast, date-fns, clsx.
 
@@ -487,7 +487,9 @@ Password rule (scripts and sign-up): at least 8 characters with a letter and a n
 - Security headers — API: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS, `Content-Security-Policy: default-src 'none'`, `Permissions-Policy`. Website (`vercel.json`): the same family plus a Content-Security-Policy allowing only the site itself, Google Fonts and the Render API (sample pages under `/samples` excluded).
 - Public `/health` shows status only; details moved to admin-only `/api/v1/admin/system-health`.
 
-**Still to do:** update vulnerable npm packages; sign-up approval (new accounts wait for an admin); login token in an HttpOnly cookie with server-side logout; upload size/type limits and private `/uploads`; more audit events; monitoring alerts; backup / key-rotation checklist.
+**Dependency updates (batch 2):** backend 26 → 3 known vulnerabilities (0 critical, 0 high): safe fixes plus major upgrades zod 4, openai 7, nodemailer 10, node-cron 4, puppeteer-core 25 (code switched to `ZodError.issues`). The 3 left are moderate (exceljs's uuid — npm's only fix is a downgrade; qs inside Express). Frontend 18 → 5: the remaining vite/esbuild issues affect only the local dev server (not the built site); zod 3 only validates forms in the browser (the server re-checks with zod 4); the react-router open-redirect needs user-controlled links, which TenderIQ doesn't build. Upgrading Vite 5→8, React Router 6→7 and frontend zod is a separate, larger task. Run `npm audit` in both folders every month.
+
+**Still to do:** sign-up approval (new accounts wait for an admin); login token in an HttpOnly cookie with server-side logout; upload size/type limits and private `/uploads`; more audit events; monitoring alerts; backup / key-rotation checklist.
 
 
 - `.gitignore` excludes every `.env`, `.env.*`, `*.env` (except `.env.example`), keys, zips, local backups and `.claude/`. Every push was checked for secrets.
@@ -514,6 +516,7 @@ Password rule (scripts and sign-up): at least 8 characters with a letter and a n
 | Local API keeps restarting | `npm run dev` restarts on file changes (normal while editing). |
 
 | Europe list says "TED is busy" | TED rate limit — wait a minute; repeat views come from the 10-minute cache. |
+| Render build fails after a dependency update | Check Node is 22.12+ (`NODE_VERSION` in Render) and that `package.json` and `package-lock.json` were committed together (`npm ci` needs both in sync). |
 | "Too many failed sign-in attempts" | 5 wrong passwords for that email from your network — wait 15 minutes (or restart the API, which clears the counters). |
 | Viewer gets "Insufficient permissions" | Viewers are read-only — an admin can change the role in Admin → Users. |
 | Need sync details (counts, errors) | `/health` is status-only now — use `/api/v1/admin/system-health` while signed in as admin. |
@@ -560,6 +563,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 31. **Live sync every 5 minutes for Europe, UK and World Bank** — background refresh like GeM (`LIVE_SYNC_MINUTES`): TED default view, Find a Tender changes, World Bank newest notices (+ full reload every 2 h); Tenders page re-checks every minute in live regions with a "Live · <source> synced x min ago" label and new-tender messages. Every 1 minute was avoided because TED and Find a Tender rate-limit (HTTP 429).
 32. **Edit / Deactivate / Sync now for live sources** — TED, Find a Tender and World Bank rows in Admin → Sources get the same buttons as the scraped sources; settings saved in `live_source_settings`; deactivated sources stop syncing, disappear from the Region list and totals.
 33. **Security hardening (batch 1)** — login lockout + rate limits, server-side password rule, neutral sign-up message, read-only viewers, no internal error details, clean 400/404, status-only public `/health` (details admin-only), security headers on the API and the website.
+34. **Security: dependency updates (batch 2)** — backend vulnerabilities 26 → 3 moderate (critical and all high fixed; zod 4, openai 7, nodemailer 10, node-cron 4, puppeteer-core 25), frontend 18 → 5 (dev-server / browser-only); Node 22.12+ required; tested API flows, GeM sync, OpenAI path, frontend build and `npm ci`.
+
 
 
 

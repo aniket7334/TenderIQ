@@ -85,7 +85,7 @@ router.post('/', auth_1.authenticate, (0, auth_1.requireRole)('admin'), async (r
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });
@@ -100,7 +100,7 @@ router.post('/bulk', auth_1.authenticate, (0, auth_1.requireRole)('admin'), asyn
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });
@@ -125,7 +125,7 @@ async function handleUpdateKeyword(req, res) {
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });
@@ -170,7 +170,7 @@ router.post('/test', auth_1.authenticate, async (req, res) => {
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });

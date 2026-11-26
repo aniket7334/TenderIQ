@@ -196,7 +196,7 @@ router.patch('/:tender_id', auth_1.authenticate, (0, auth_1.requireRole)('analys
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.errors });
+            return res.status(422).json({ detail: err.issues });
         if (err instanceof errorHandler_1.AppError)
             return res.status(err.statusCode).json({ detail: err.message });
         res.status(500).json({ detail: 'Internal server error' });
