@@ -19,6 +19,8 @@ function startScheduler() {
 
     // UK tenders (Find a Tender): load the in-memory working copy and keep it fresh
     require('../sources/fts').warmUp();
+    // Europe tenders (TED): refresh the default view every few minutes
+    require('../sources/ted').warmUp();
     // World Bank notices (worldwide): in-memory working copy, translated titles
     require('../sources/worldbank').warmUp();
 

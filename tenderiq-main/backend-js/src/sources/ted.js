@@ -13,7 +13,10 @@
 const { AppError } = require('../middleware/errorHandler');
 
 const TED_SEARCH = 'https://api.ted.europa.eu/v3/notices/search';
-const CACHE_MS = 10 * 60 * 1000;
+// How often live sources refresh in the background (minutes). 5 like GeM; much more
+// often gets the server rate-limited (HTTP 429) by TED / Find a Tender.
+const SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
+const CACHE_MS = SYNC_MS;
 const ID_PREFIX = 'ted-';
 
 /* ------------------------------------------------------------------ */
@@ -161,6 +164,7 @@ async function tedSearch(body) {
             health.last_ok_at = new Date().toISOString();
             health.ok_calls++;
             health.last_ms = Date.now() - started;
+            if (data && typeof data === 'object') data._fetchedAt = new Date().toISOString();
             return data;
         }
     })();
@@ -303,6 +307,7 @@ async function searchTenders({ region, city, category, search, page = 1, pageSiz
         page_size: size,
         total_pages: Math.max(1, Math.ceil(total / size)),
         live_source: 'TED',
+        synced_at: data?._fetchedAt || null,
         default_sectors: !category, // true → showing the priority group
     };
 }
@@ -382,6 +387,19 @@ async function getDocuments(id) {
 
 const isLiveId = (id) => String(id || '').startsWith(ID_PREFIX);
 
+/** Background sync: refresh the default Europe view + count every SYNC_MS (2 small requests). */
+let syncTimer = null;
+function warmUp() {
+    const refresh = () => Promise.all([searchTenders({ region: EUROPE, page: 1, pageSize: 20 }), countEurope({ waitMs: 20000 })])
+        .catch((e) => console.error('[TED] refresh failed:', e.message));
+    refresh();
+    if (!syncTimer) {
+        // just after the cache expires, so the next visitor gets fresh results instantly
+        syncTimer = setInterval(refresh, SYNC_MS + 5000);
+        syncTimer.unref?.();
+    }
+}
+
 /** Small status for /health: open Europe tenders (cached count) and the last TED problem. */
 async function tedHealth() {
     const open_tenders = await countEurope({ waitMs: 8000 });
@@ -409,7 +427,7 @@ async function sourceInfo({ fresh = false } = {}) {
         base_url: 'https://api.ted.europa.eu/v3/notices/search',
         website: 'https://ted.europa.eu',
         coverage: `${Object.keys(EUROPE_COUNTRIES).length} countries — EU 27, Norway, Iceland, Switzerland, Liechtenstein`,
-        storage: 'Not stored — read live (10-minute memory cache)',
+        storage: `Not stored — read live, refreshed every ${SYNC_MS / 60000} minutes`,
         api_key: 'Not needed',
         default_view: 'Dredging, marine, pipeline & shipping tenders',
         status: ok ? 'online' : (health.last_error && /Busy/.test(health.last_error) ? 'busy' : 'unreachable'),
@@ -439,7 +457,7 @@ async function countEurope({ waitMs = 6000 } = {}) {
 
 module.exports = {
     EUROPE, EUROPE_COUNTRIES, isEuropeRegion, isLiveId,
-    searchTenders, getTender, getDocuments, countEurope, sourceInfo, tedHealth,
+    searchTenders, getTender, getDocuments, countEurope, sourceInfo, tedHealth, warmUp,
     // for tests
     categoriesFromCpv, categoryClause, tedDate,
     // shared with the UK source (same CPV system)

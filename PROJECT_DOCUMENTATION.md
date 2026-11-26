@@ -210,6 +210,7 @@ Changes to live (`ted-`/`uk-`/`wb-`) tenders (shortlist, tags, comments, edits) 
 | Daily 8 AM | Closing-soon (deadline) alerts |
 | Weekly (Sun 3 AM) | Clean up old scrape runs |
 | Every 10 min (Render only) | Keep-awake ping of its own `/health` |
+| Every 5 min (`LIVE_SYNC_MINUTES`) | **Live sources:** TED default Europe view + count refreshed; Find a Tender changes merged; World Bank newest notices merged (full World Bank reload every 2 h) |
 
 ---
 
@@ -270,6 +271,8 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 **Mapping:** titles in English (TED's translated title), buyer, city, country, deadline (earliest lot), estimated value (token amounts under 1,000 treated as not disclosed), categories from CPV codes. Tender ids look like `ted-766488-2026`.
 
 **Detail & how to apply:** procedure, lot titles/descriptions (buyer's language), submission URL, documents URL, buyer email/phone/address/website, English notice PDF (`ted.europa.eu/en/notice/<id>/pdf`) and notice page.
+
+**Background sync:** every `LIVE_SYNC_MINUTES` (default 5) the server refreshes the default Europe view and count, so results are never more than ~5 minutes old (the memory cache lasts the same time). While a live region is open, the Tenders page re-checks every minute (served from that cache — no extra load on TED), shows **"Live · TED synced x min ago"** and announces new tenders.
 
 **Totals without storage:** TED returns the number of matching notices with every search, so counts are asked live (cached 10 minutes, never more than 6 s of waiting): the Dashboard's **Total tenders** = India tenders (stored) + Europe tenders (live), shown as "India N · Europe N (live)"; the Region dropdown shows **All Europe (N)** and the Sector field shows the live total for the Europe view or the chosen sector (e.g. Pipeline (312)).
 
@@ -395,6 +398,7 @@ Values are never committed. Templates with names only: `backend-js/.env.example`
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Email (optional) |
 | `GOOGLE_CLIENT_ID/SECRET`, `MICROSOFT_CLIENT_ID/SECRET` | OAuth sign-in (optional) |
 | `GEM_SYNC_MINUTES` | Minutes between GeM syncs (default 5) |
+| `LIVE_SYNC_MINUTES` | Minutes between background refreshes of the live sources — TED, Find a Tender, World Bank (default 5, min 2; faster gets rate-limited) |
 | `KEEP_AWAKE` | Render only; `false` lets the free server sleep (stops live sync) |
 | `GEM_PROXY_URL`, `GEM_PROXY_KEY` | **Render only** — GeM relay address and shared key. Leave empty locally. |
 | `TRANSLATE_MODEL` | Optional OpenAI model for translating World Bank notices (default `gpt-4o-mini`; uses `OPENAI_API_KEY`) |
@@ -534,6 +538,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 28. **United Kingdom, live from Find a Tender** — Region group "United Kingdom — live from Find a Tender" (All UK + 4 nations), City filter, tender page with Documents and How to apply, UK in Dashboard total, Find a Tender row in Sources; UK tenders kept in server memory (refreshed every 30 min), never in the database; live sources now go through `src/sources/index.js`.
 29. **Worldwide, live from the World Bank** — Region group "Worldwide — live from the World Bank" (all + ~100 countries), ~600 open notices kept in memory (30-min refresh), French/Spanish/Portuguese matched through a built-in glossary and translated with OpenAI when credit is available (paused automatically otherwise), Overview/Documents (full notice text)/How to apply (contact person, email, phone), World Bank in Dashboard total and Sources.
 30. **Region list clean-up** — removed the empty "United Nations" option (UNGM blocks automated access, so there is no UN source); `/health` reports TED reachability (`ted_live`).
+31. **Live sync every 5 minutes for Europe, UK and World Bank** — background refresh like GeM (`LIVE_SYNC_MINUTES`): TED default view, Find a Tender changes, World Bank newest notices (+ full reload every 2 h); Tenders page re-checks every minute in live regions with a "Live · <source> synced x min ago" label and new-tender messages. Every 1 minute was avoided because TED and Find a Tender rate-limit (HTTP 429).
+
 
 
 ---

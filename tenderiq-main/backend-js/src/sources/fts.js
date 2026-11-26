@@ -18,7 +18,10 @@ const API = 'https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages'
 const NOTICE_URL = 'https://www.find-tender.service.gov.uk/Notice/';
 const ID_PREFIX = 'uk-';
 const WINDOW_DAYS = 180;         // notices updated in this window can still be open
-const REFRESH_MS = 30 * 60 * 1000;
+// How often live sources refresh in the background (minutes). 5 like GeM; much more
+// often gets the server rate-limited (HTTP 429) by TED / Find a Tender.
+const SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
+const REFRESH_MS = SYNC_MS; // only the changes since the last sync (1–2 requests)
 const PAGE_DELAY_MS = 1100;      // Find a Tender rate-limits fast clients (HTTP 429)
 
 /* ------------------------------------------------------------------ */
@@ -272,6 +275,7 @@ async function searchTenders({ region, city, category, search, page = 1, pageSiz
         page_size: size,
         total_pages: Math.max(1, Math.ceil(list.length / size)),
         live_source: 'Find a Tender',
+        synced_at: lastSyncAt,
         default_sectors: !category,
     };
 }
@@ -368,7 +372,7 @@ async function sourceInfo({ fresh = false } = {}) {
         open_path: `/tenders?country=${encodeURIComponent(UK)}`,
         region_label: 'United Kingdom',
         coverage: 'United Kingdom — England, Scotland, Wales, Northern Ireland',
-        storage: 'Not stored — kept in server memory, refreshed every 30 minutes',
+        storage: `Not stored — kept in server memory, refreshed every ${SYNC_MS / 60000} minutes`,
         api_key: 'Not needed',
         status: ok ? 'online' : loading ? 'loading' : (health.last_error && /Busy/.test(health.last_error) ? 'busy' : 'unreachable'),
         open_tenders: await countUk(),

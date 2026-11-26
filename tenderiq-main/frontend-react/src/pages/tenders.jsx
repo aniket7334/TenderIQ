@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronUp,
@@ -232,7 +232,7 @@ function TendersPageContent() {
 
       const res = await api.get('/tenders', { params });
       setTenders(res.data.items);
-      setLiveInfo(res.data.live_source ? { source: res.data.live_source, defaultSectors: res.data.default_sectors } : null);
+      setLiveInfo(res.data.live_source ? { source: res.data.live_source, defaultSectors: res.data.default_sectors, syncedAt: res.data.synced_at } : null);
       setTotal(res.data.total);
       setTotalPages(res.data.total_pages);
     } catch (err) {
@@ -271,6 +271,26 @@ function TendersPageContent() {
   }, [fetchTenders]);
 
   // Live: new GeM tenders show up in the list by themselves
+  // Live regions (TED / Find a Tender / World Bank): re-check every minute while the page
+  // is open. The server refreshes each source every 5 minutes, so this costs the source nothing.
+  const seenLiveIds = useRef(null);
+  useEffect(() => {
+    seenLiveIds.current = null;
+    if (!europeMode) return undefined;
+    const tick = () => document.visibilityState === 'visible' && fetchTenders(true);
+    const timer = setInterval(tick, 60 * 1000);
+    return () => clearInterval(timer);
+  }, [europeMode, fetchTenders]);
+  useEffect(() => {
+    if (!europeMode || !liveInfo) return;
+    const ids = new Set(tenders.map((t) => t.id));
+    if (seenLiveIds.current && (filters.page || 1) === 1) {
+      const fresh = [...ids].filter((id) => !seenLiveIds.current.has(id)).length;
+      if (fresh > 0) toast.success(`${fresh} new ${liveInfo.source} tender${fresh === 1 ? '' : 's'}`, { id: 'live-region-new' });
+    }
+    seenLiveIds.current = new Set([...(seenLiveIds.current || []), ...ids]);
+  }, [tenders]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { sync } = useLiveTenders((count) => {
     if (europeMode) return; // new GeM tenders don't change the live TED view
     fetchTenders(true);
@@ -443,7 +463,11 @@ function TendersPageContent() {
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Global Tenders</h1>
-          <LiveStatus sync={sync} className="mt-1" />
+          {europeMode && liveInfo ? (
+            <LiveStatus sync={{ last_success_at: liveInfo.syncedAt }} label={liveInfo.source} className="mt-1" />
+          ) : (
+            <LiveStatus sync={sync} className="mt-1" />
+          )}
         </div>
       </div>
 

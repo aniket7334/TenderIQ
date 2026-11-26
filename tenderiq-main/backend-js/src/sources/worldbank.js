@@ -20,7 +20,11 @@ const NOTICE_PAGE = 'https://projects.worldbank.org/en/projects-operations/procu
 const ID_PREFIX = 'wb-';
 const REGION = 'World Bank';          // "All World Bank countries"
 const COUNTRY_PREFIX = 'World Bank: '; // "World Bank: Nigeria"
-const REFRESH_MS = 30 * 60 * 1000;
+// How often live sources refresh in the background (minutes). 5 like GeM; much more
+// often gets the server rate-limited (HTTP 429) by TED / Find a Tender.
+const SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
+const REFRESH_MS = SYNC_MS;
+const FULL_RELOAD_MS = 2 * 60 * 60 * 1000; // between quick syncs, only the newest notices are read
 const OPEN_TYPES = ['Invitation for Bids', 'Request for Expression of Interest', 'Invitation for Prequalification'];
 const LIST_FIELDS = 'id,notice_type,noticedate,submission_deadline_date,submission_deadline_time,project_ctry_name,project_id,project_name,bid_description,bid_reference_no,procurement_group,procurement_method_name,notice_lang_name,contact_organization,contact_address,contact_ctry_name';
 const GROUPS = { CW: 'Works', GO: 'Goods', CS: 'Consulting services', NC: 'Non-consulting services' };
@@ -35,6 +39,7 @@ const isWorldBankRegion = (v) => v === REGION || String(v || '').startsWith(COUN
 
 const snapshot = new Map(); // notice id → compact notice
 let lastSyncAt = null;
+let lastFullAt = null;
 let loading = null;
 let timer = null;
 const health = { last_ok_at: null, last_ms: null, last_error: null, last_error_at: null, calls: 0, ok_calls: 0 };
@@ -132,7 +137,32 @@ async function sync() {
         snapshot.clear();
         for (const [k, v] of fresh) snapshot.set(k, v);
         lastSyncAt = now;
+        lastFullAt = now;
         console.log(`[World Bank] ${snapshot.size} open notices (${foreign.length} non-English, ${translated.size} translated)`);
+    })().finally(() => { loading = null; });
+    return loading;
+}
+
+/** Quick sync: newest notices of each open type (3 requests), merged in; closed ones dropped. */
+async function quickSync() {
+    if (loading || !lastFullAt) return;
+    loading = (async () => {
+        const now = new Date().toISOString();
+        const added = [];
+        for (const type of OPEN_TYPES) {
+            const data = await call({ rows: 100, os: 0, notice_type: type, srt: 'noticedate', order: 'desc', fl: LIST_FIELDS });
+            for (const n of data.procnotices || []) {
+                const c = compact(n);
+                if (c.deadline && c.deadline >= now && !snapshot.has(c.id)) added.push(c);
+            }
+            await wait(400);
+        }
+        const foreign = added.filter((c) => !isEnglish(c.lang));
+        const translated = await translateTitles(foreign.map((c) => ({ key: `wb-title-${c.id}`, text: c.title })));
+        for (const c of added) { c.title_en = translated.get(`wb-title-${c.id}`) || null; classify(c); snapshot.set(c.id, c); }
+        for (const [id, c] of snapshot) if (!c.deadline || c.deadline < now) snapshot.delete(id);
+        lastSyncAt = now;
+        if (added.length) console.log(`[World Bank] quick sync: ${added.length} new notices`);
     })().finally(() => { loading = null; });
     return loading;
 }
@@ -140,14 +170,17 @@ async function sync() {
 function warmUp() {
     sync().catch((e) => console.error('[World Bank] load failed:', e.message));
     if (!timer) {
-        timer = setInterval(() => sync().catch((e) => console.error('[World Bank] refresh failed:', e.message)), REFRESH_MS);
+        timer = setInterval(() => {
+            const full = !lastFullAt || Date.now() - new Date(lastFullAt).getTime() > FULL_RELOAD_MS;
+            (full ? sync() : quickSync()).catch((e) => console.error('[World Bank] refresh failed:', e.message));
+        }, REFRESH_MS);
         timer.unref?.();
     }
 }
 
 async function ready(waitMs = 25000) {
     if (lastSyncAt) {
-        if (Date.now() - new Date(lastSyncAt).getTime() > REFRESH_MS) sync().catch(() => {});
+        if (Date.now() - new Date(lastSyncAt).getTime() > REFRESH_MS * 2) quickSync()?.catch(() => {});
         return;
     }
     const done = await Promise.race([sync().then(() => true).catch(() => false), wait(waitMs).then(() => false)]);
@@ -222,6 +255,7 @@ async function searchTenders({ region, city, category, search, page = 1, pageSiz
         page_size: size,
         total_pages: Math.max(1, Math.ceil(list.length / size)),
         live_source: 'World Bank',
+        synced_at: lastSyncAt,
         default_sectors: !category,
     };
 }
@@ -362,7 +396,7 @@ async function sourceInfo({ fresh = false } = {}) {
         open_path: `/tenders?country=${encodeURIComponent(REGION)}`,
         region_label: 'Worldwide',
         coverage: `${countries().length} countries with open notices`,
-        storage: 'Not stored — kept in server memory, refreshed every 30 minutes',
+        storage: `Not stored — kept in server memory, new notices every ${SYNC_MS / 60000} minutes, full reload every 2 hours`,
         api_key: 'Not needed',
         status: ok ? 'online' : loading ? 'loading' : 'unreachable',
         open_tenders: await countWorldBank(),
