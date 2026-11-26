@@ -39,10 +39,9 @@ const errorHandler_1 = require("../middleware/errorHandler");
 const { pool } = require("../db");
 const auditService = __importStar(require("../services/audit.service"));
 const router = (0, express_1.Router)();
-router.use(auth_1.authenticate, (0, auth_1.requireRole)('admin'));
-
-// GET /dashboard
-router.get('/dashboard', async (_req, res) => {
+// GET /dashboard - tender figures for every signed-in user (the Dashboard page);
+// scrape-run details are admin only. Every other route below is admin only.
+router.get('/dashboard', auth_1.authenticate, async (req, res) => {
     try {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -141,7 +140,7 @@ router.get('/dashboard', async (_req, res) => {
             new_tenders: newR[0].c,
             shortlisted_tenders: shortR[0].c,
             active_sources: sourceR[0].c,
-            recent_scrape_runs: recentRuns,
+            recent_scrape_runs: req.user?.role === 'admin' ? recentRuns : [],
         });
     }
     catch (err) {
@@ -149,6 +148,8 @@ router.get('/dashboard', async (_req, res) => {
         res.status(500).json({ detail: 'Internal server error' });
     }
 });
+
+router.use(auth_1.authenticate, (0, auth_1.requireRole)('admin'));
 
 // GET /audit-logs
 // GET /system-health - Full sync / source details (admin only; the public /health shows status only)
@@ -179,6 +180,9 @@ router.get('/audit-logs', async (req, res) => {
         if (req.query.entity_type) params.entityType = req.query.entity_type;
         if (req.query.entity_id) params.entityId = req.query.entity_id;
         if (req.query.user_id) params.userId = req.query.user_id;
+        if (req.query.action) params.action = String(req.query.action);
+        if (req.query.date_from) params.dateFrom = String(req.query.date_from);
+        if (req.query.date_to) params.dateTo = String(req.query.date_to);
         if (req.query.page) params.page = parseInt(req.query.page, 10);
         if (req.query.page_size) params.page_size = parseInt(req.query.page_size, 10);
         const result = await auditService.getAuditLogs(params);

@@ -43,6 +43,8 @@ const navigation = [
   },
   {
     title: 'Admin Section',
+    // Only admins see these links (the server also restricts these pages to admins)
+    adminOnly: true,
     items: [
       { label: 'Sources', href: '/admin/sources', icon: Globe },
       { label: 'Keywords', href: '/admin/keywords', icon: KeyRound },
@@ -65,18 +67,8 @@ export default function AppLayout({ children }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('tenderiq_user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        setUser(null);
-      }
-    }
-  }, []);
+  // Signed-in user from the auth store (kept in sync with the server via /auth/me)
+  const user = useAuth((s) => s.user);
 
   /* ---- Header bell: unread alert count (+ browser notifications when enabled) ---- */
   const { unread } = useAlertNotifications((alert) =>
@@ -162,8 +154,8 @@ export default function AppLayout({ children }) {
       {/* Nav links */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {navigation.map((section, idx) => {
-          // Hide admin section for non-admin/manager users
-          if (section.title === 'Admin' && user?.role !== 'admin' && user?.role !== 'manager') {
+          // Admin section: admins only (it used to compare the title with 'Admin', which never matched)
+          if (section.adminOnly && user?.role !== 'admin') {
             return null;
           }
           return (

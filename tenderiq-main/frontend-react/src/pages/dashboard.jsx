@@ -20,6 +20,7 @@ import api from '@/lib/api';
 import { formatCurrency, formatDate, getStatusLabel } from '@/lib/utils';
 import { useLiveTenders } from '@/hooks/useLiveTenders';
 import { LiveStatus } from '@/components/ui/live-status';
+import useAuth from '@/hooks/useAuth';
 
 /* Classic & simple: white cards, navy text, grey details. No status colours —
    urgency is shown with words ("Today", "2 days left") and weight, not red. */
@@ -84,6 +85,7 @@ const ViewAll = ({ to }) => (
 );
 
 export default function DashboardPage() {
+  const isAdmin = useAuth((s) => s.user)?.role === 'admin';
   const [stats, setStats] = useState(null);
   const [recentTenders, setRecentTenders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -198,6 +200,9 @@ export default function DashboardPage() {
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
+          {/* Fetching from the portals is admin-only (the server refuses it for other roles) */}
+          {isAdmin && (
+          <>
           <Button
             onClick={handleGemNow}
             loading={scrapingGem}
@@ -218,6 +223,8 @@ export default function DashboardPage() {
             <Rocket className="h-4 w-4" />
             Scrape Now
           </Button>
+          </>
+          )}
         </div>
       </div>
 

@@ -31,7 +31,8 @@ function goToLogin() {
 let refreshing = null;
 function refreshSession() {
   if (!refreshing) {
-    refreshing = api.post('/auth/refresh', null, { _isRefresh: true }).finally(() => {
+    // Send {} (not null): the API's JSON reader refuses a bare "null" body with 400
+    refreshing = api.post('/auth/refresh', {}, { _isRefresh: true }).finally(() => {
       setTimeout(() => {
         refreshing = null;
       }, 0);

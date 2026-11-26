@@ -21,14 +21,59 @@ import useAuth from '@/hooks/useAuth';
 
 const ENTITY_TYPE_OPTIONS = [
   { value: '', label: 'All Entity Types' },
+  { value: 'auth', label: 'Sign-in & sign-up' },
   { value: 'tender', label: 'Tender' },
   { value: 'source', label: 'Source' },
+  { value: 'live_source', label: 'Live source' },
   { value: 'keyword', label: 'Keyword' },
   { value: 'template', label: 'Template' },
   { value: 'user', label: 'User' },
   { value: 'alert', label: 'Alert' },
   { value: 'tender_note', label: 'Tender Note' },
 ];
+
+/* Plain-English names for the recorded actions (unknown ones are shown as-is) */
+const ACTION_LABELS = {
+  login: 'Signed in',
+  logout: 'Signed out',
+  login_failed: 'Failed sign-in',
+  login_locked_out: 'Sign-in locked out',
+  login_blocked: 'Sign-in refused (account not active)',
+  signup_requested: 'Sign-up requested',
+  approve_signup: 'Sign-up approved',
+  reject_signup: 'Sign-up rejected',
+  create_user: 'User created',
+  update_user: 'User updated',
+  change_role: 'Role changed',
+  create_source: 'Source added',
+  update_source: 'Source updated',
+  delete_source: 'Source deleted',
+  update_live_source: 'Live source settings changed',
+  sync_now: 'Live source synced',
+  scrape_now: 'Scrape started',
+  scrape_all: 'Scrape all started',
+  create_keyword: 'Keyword added',
+  bulk_add_keywords: 'Keywords added (bulk)',
+  update_keyword: 'Keyword updated',
+  delete_keyword: 'Keyword deleted',
+  create_template: 'Template created',
+  upload_template: 'Template uploaded',
+  update_template: 'Template updated',
+  delete_template: 'Template deleted',
+  update: 'Tender updated',
+  shortlist: 'Shortlist changed',
+  add_tag: 'Tag added',
+  remove_tag: 'Tag removed',
+  add_comment: 'Comment added',
+  fetch_details: 'Details fetched',
+  generate_note: 'Note generated',
+  update_note: 'Note edited',
+  export_note: 'Note exported',
+  update_alert_settings: 'Alert settings changed',
+};
+const actionLabel = (action) => ACTION_LABELS[action] || action;
+// Security-relevant actions get the stronger badge
+const SECURITY_ACTIONS = new Set(['login_failed', 'login_locked_out', 'login_blocked', 'change_role', 'reject_signup']);
 
 export default function AuditLogPage() {
   const navigate = useNavigate();
@@ -112,16 +157,61 @@ export default function AuditLogPage() {
 
   const hasActiveFilters = entityType || userId || dateFrom || dateTo;
 
-  const handleExport = () => {
-    // Placeholder: In a real implementation, this would call an export API endpoint
-    alert('Export functionality coming soon. This will export audit logs as CSV.');
+  /* Export: the entries matching the current filters (up to 5,000) as a CSV file */
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const params = { page_size: 1000 };
+      if (entityType) params.entity_type = entityType;
+      if (userId) params.user_id = userId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      const rows = [];
+      for (let p = 1; p <= 5; p++) {
+        const res = await api.get('/admin/audit-logs', { params: { ...params, page: p } });
+        rows.push(...(res.data.items || []));
+        if (p >= (res.data.total_pages || 1)) break;
+      }
+      const cell = (v) => {
+        let s = v == null ? '' : String(v);
+        // Stop spreadsheet apps from running text that starts like a formula
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const lines = [['Time', 'User', 'Action', 'Entity type', 'Entity ID', 'IP address', 'Details'].join(',')];
+      for (const r of rows) {
+        lines.push([
+          formatDate(r.created_at, 'yyyy-MM-dd HH:mm:ss'),
+          r.user_name || 'System',
+          actionLabel(r.action),
+          r.entity_type,
+          r.entity_id || '',
+          r.ip_address || '',
+          r.changes ? JSON.stringify(r.changes) : '',
+        ].map(cell).join(','));
+      }
+      const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tenderiq-audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const getActionBadge = (action) => {
-    if (action.includes('create') || action.includes('add')) return <Badge variant="success">{action}</Badge>;
-    if (action.includes('delete') || action.includes('remove')) return <Badge variant="danger">{action}</Badge>;
-    if (action.includes('update') || action.includes('change') || action.includes('edit')) return <Badge variant="warning">{action}</Badge>;
-    return <Badge variant="default">{action}</Badge>;
+    const label = actionLabel(action);
+    if (SECURITY_ACTIONS.has(action)) return <Badge variant="warning">{label}</Badge>;
+    if (action.includes('create') || action.includes('add') || action === 'login' || action === 'approve_signup') return <Badge variant="success">{label}</Badge>;
+    if (action.includes('delete') || action.includes('remove')) return <Badge variant="danger">{label}</Badge>;
+    if (action.includes('update') || action.includes('change') || action.includes('edit')) return <Badge variant="info">{label}</Badge>;
+    return <Badge variant="default">{label}</Badge>;
   };
 
   if (!isAdmin) {
@@ -144,7 +234,7 @@ export default function AuditLogPage() {
           <p className="mt-1 text-sm text-gray-500">{total} entries</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={handleExport} variant="outline" size="md">
+          <Button onClick={handleExport} variant="outline" size="md" loading={exporting} disabled={exporting || total === 0}>
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>
           </Button>
@@ -286,7 +376,7 @@ export default function AuditLogPage() {
                           {getActionBadge(log.action)}
                         </td>
                         <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4">
-                          <Badge variant="info">{log.entity_type}</Badge>
+                          <Badge variant="default">{(ENTITY_TYPE_OPTIONS.find((o) => o.value === log.entity_type) || {}).label || log.entity_type}</Badge>
                         </td>
                         <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm font-mono text-gray-600">
                           {log.entity_id ? `${String(log.entity_id).slice(0, 8)}...` : '-'}

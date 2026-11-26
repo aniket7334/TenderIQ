@@ -19,7 +19,8 @@ app.use((0, cors_1.default)({
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true }));
-app.use('/uploads', express_1.default.static('uploads'));
+// Uploaded files are NOT served publicly (no /uploads). Template files are downloaded
+// through GET /api/v1/templates/:id/file, which needs a signed-in user.
 app.get('/health', async (_req, res) => {
     try {
         await pool.execute('SELECT 1');

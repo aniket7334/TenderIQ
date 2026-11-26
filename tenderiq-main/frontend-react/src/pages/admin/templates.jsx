@@ -13,6 +13,7 @@ import {
   Upload,
   Eye,
   Calendar,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,8 @@ export default function TemplatesPage() {
   const [uploadName, setUploadName] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
+  // Why the upload was refused (wrong type, too large, ...)
+  const [uploadError, setUploadError] = useState('');
   const [uploadIsDefault, setUploadIsDefault] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -81,10 +84,28 @@ export default function TemplatesPage() {
     }
   }, [toast]);
 
+  // Same rules as the server: Word (.docx) only, up to 10 MB
+  const MAX_TEMPLATE_MB = 10;
+  const pickUploadFile = (file) => {
+    setUploadError('');
+    if (file && !/\.docx$/i.test(file.name)) {
+      setUploadError('Only Word templates (.docx) can be uploaded.');
+      setUploadFile(null);
+      return;
+    }
+    if (file && file.size > MAX_TEMPLATE_MB * 1024 * 1024) {
+      setUploadError(`The file is too large. Templates can be up to ${MAX_TEMPLATE_MB} MB.`);
+      setUploadFile(null);
+      return;
+    }
+    setUploadFile(file || null);
+  };
+
   const handleUpload = async () => {
     if (!uploadFile) return;
     try {
       setUploading(true);
+      setUploadError('');
       const formData = new FormData();
       formData.append('file', uploadFile);
 
@@ -110,8 +131,8 @@ export default function TemplatesPage() {
       setUploadFile(null);
       setUploadIsDefault(false);
       fetchTemplates();
-    } catch {
-      // handled by interceptor
+    } catch (err) {
+      setUploadError(err?.message || 'The upload failed.');
     } finally {
       setUploading(false);
     }
@@ -280,6 +301,15 @@ export default function TemplatesPage() {
                   >
                     <Eye className="h-4 w-4" />
                   </button>
+                  {template.has_file && (
+                    <a
+                      href={`/api/v1/templates/${template.id}/file`}
+                      title="Download the Word file"
+                      className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                  )}
                   {!template.is_default && (
                     <button
                       onClick={() => handleSetDefault(template.id)}
@@ -311,7 +341,7 @@ export default function TemplatesPage() {
       </div>
 
       {/* Upload Template Modal */}
-      <Modal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} title="Upload Template" size="lg">
+      <Modal isOpen={showUploadModal} onClose={() => { setShowUploadModal(false); setUploadError(''); }} title="Upload Template" size="lg">
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Name</label>
@@ -328,14 +358,20 @@ export default function TemplatesPage() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Template File (.docx) *</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Template File (.docx, up to 10 MB) *</label>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".docx"
-              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(e) => pickUploadFile(e.target.files?.[0] || null)}
               className="block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
             />
+            {uploadError && (
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-700">
+                <AlertTriangle className="h-4 w-4 text-gray-500" />
+                {uploadError}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <input

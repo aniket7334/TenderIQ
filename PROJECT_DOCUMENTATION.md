@@ -150,7 +150,7 @@ Folders such as `frontend-react-backup-*` and `ci-test` at the repo root are loc
 
 ## 5. Tech stack
 
-**Backend** — Node.js 22 (22.12 or newer — required by openai 7 and puppeteer-core 25), Express 4, mysql2 (promise pool), node-cron, axios, cheerio (HTML parsing), pdf-parse (GeM bid PDFs), bcryptjs + jsonwebtoken (auth), multer (uploads), docx / exceljs / mammoth (exports & templates), openai / @anthropic-ai/sdk (AI notes), nodemailer, puppeteer-core (optional browser fallback), zod.
+**Backend** — Node.js 22 (22.12 or newer — required by openai 7 and puppeteer-core 25), Express 4, mysql2 (promise pool), node-cron, axios, cheerio (HTML parsing), pdf-parse (GeM bid PDFs), bcryptjs + jsonwebtoken (auth), multer 2 (uploads), docx / exceljs / mammoth (exports & templates), openai / @anthropic-ai/sdk (AI notes), nodemailer, puppeteer-core (optional browser fallback), zod.
 
 **Frontend** — React 18 (JSX), Vite 5, React Router 6, Tailwind CSS 3 (+ forms plugin), zustand (auth store), axios, recharts (charts), lucide-react (icons), react-hot-toast, date-fns, clsx.
 
@@ -196,10 +196,10 @@ Changes to live (`ted-`/`uk-`/`wb-`) tenders (shortlist, tags, comments, edits) 
 
 ### Others
 - `/keywords` — keyword CRUD, bulk add, test matching
-- `/templates` — tender-note templates (upload Word templates, placeholders)
+- `/templates` — tender-note templates (upload Word templates — admin only, `.docx` up to 10 MB; placeholders; `GET /:id/file` downloads the Word file for signed-in users)
 - `/tender-notes` — generate AI notes for a tender, edit, export
 - `/admin/users/:id/approve` (`{ role }`) and `/admin/users/:id/reject` — sign-up approval; changing a user's password, deactivating or rejecting them ends all their sessions
-- `/admin` — `GET /dashboard` (stats, upcoming deadlines, monthly trend; `europe_live_total` / `uk_live_total` / `worldbank_live_total` = live counts added to Total tenders, `stored_tenders` = India tenders in the database), `GET /audit-logs`, user management (`/users`, roles)
+- `/admin` — everything is **admin only**, except `GET /dashboard`, which any signed-in user can read (it feeds the Dashboard page; `recent_scrape_runs` is empty for non-admins). `GET /dashboard` (stats, upcoming deadlines, monthly trend; `europe_live_total` / `uk_live_total` / `worldbank_live_total` = live counts added to Total tenders, `stored_tenders` = India tenders in the database), `GET /audit-logs` (filters: `entity_type`, `user_id`, `action`, `date_from` / `date_to` as YYYY-MM-DD; `page_size` up to 1000), user management (`/users`, roles)
 - Extra routes in `routes/index.js`: `/dashboard`, `/extract-costs`, `/tenders/:id/infographic`, `/live-tenders`, `/live-tenders/import`
 
 ### Scheduler (`src/workers/scheduler.js`)
@@ -232,11 +232,11 @@ MySQL-compatible (XAMPP locally, **TiDB Cloud** in production). Tables are creat
 | `tender_documents` | Bid document + attachments (from GeM) and team uploads |
 | `corrigenda` | Corrigendum notices |
 | `scrape_runs` | Every scrape run: status, listings read, new tenders, heartbeat, error |
-| `keywords` | Team keywords (for matching & alerts) |
+| `keywords` | Team keywords (for matching & alerts); `priority` 1–5 (default 3, column added at start-up if missing) |
 | `alerts` | In-app alerts per user |
 | `user_preferences` | Notification settings (new tenders, deadlines, reminder days, keywords-only, categories) |
 | `note_templates`, `tender_notes` | AI tender-note templates and generated notes |
-| `audit_logs` | Who did what |
+| `audit_logs` | Who did what, when, from which IP (`entity_id` is `''` when there is no item, e.g. sign-in; times to the second) |
 | `user_sessions` | One row per sign-in (session id, user, created / last used / expires / revoked, IP, browser) — tokens carry the session id; logout / password change / deactivation revoke it. Never stores the token |
 | `users.signup_status` | `pending` / `approved` / `rejected` for self sign-ups (NULL = older accounts = approved) |
 | `live_source_settings` | On/off and refresh interval of the live sources (TED, Find a Tender, World Bank) — settings only, never tenders; created on start |
@@ -336,7 +336,7 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 ## 10. Frontend (web app)
 
 - **Routing** (`App.jsx`): `/login`, `/register`, `/dashboard`, `/tenders`, `/tenders/:id`, `/shortlisted`, `/tender-notes`, `/tender-notes/:id`, `/alerts`, `/settings`, `/admin/sources|keywords|templates|users|audit-log`.
-- **Layout** (`components/layout/app-layout.jsx`): navy sidebar (Dashboard, Tenders, Shortlisted, Tender Notes, Alerts; Admin section; Settings, Support), header search (× to clear, search button, Enter), alert bell with unread count, profile menu.
+- **Layout** (`components/layout/app-layout.jsx`): navy sidebar (Dashboard, Tenders, Shortlisted, Tender Notes, Alerts; **Admin section — shown to admins only**; Settings, Support), header search (× to clear, search button, Enter), alert bell with unread count, profile menu.
 - **API client** (`lib/api.js`): uses `VITE_API_URL` if set, otherwise the live Render API; adds the JWT; on 401 signs out.
 - **Design**: classic & simple — navy, white and warm grey; serif page titles (Source Serif); no gold accents; urgency shown with words ("Today", "2 days left") rather than red. Favicon: white briefcase on navy.
 - **Responsive**: mobile, tablet and desktop layouts (collapsible sidebar, stacked cards on phones).
@@ -391,6 +391,7 @@ Results are cached for 24 hours (**Re-fetch** refreshes). The API always answers
 - The JWT secret is generated by Render.
 - Roles: **admin**, **manager**, **analyst**, **viewer**. The Admin section (sources, keywords, templates, users, audit log) is for admin; scraping and source buttons need admin.
 - **Viewers are read-only.** Shortlisting, tags, comments, editing tenders, fetching details from the source and generating/editing AI notes need analyst, manager or admin; "extract costs" needs manager or admin. The web pages hide those buttons for viewers.
+- **Admin area is for admins only.** Non-admins (viewer, analyst, manager) don't see the sidebar's Admin section (Sources, Keywords, Templates, Users, Audit Log) or the dashboard's GeM Now / Scrape Now buttons; opening an `/admin/...` address shows "This area is for administrators only", and the API refuses those routes (403).
 - **Password rule (enforced by the server):** at least 8 characters with a letter and a number, max 128, common passwords (password123, 12345678, …) refused — for sign-up and when an admin creates or changes a password.
 - **Login protection:** 5 wrong passwords for an email from one network → that email is locked there for 15 minutes; sign-in/sign-up limited to 30 attempts per 15 minutes per IP; failed logins are written to the audit log.
 - Demo accounts exist only in the local database (`*@tenderiq.com` / `*@tenderiq.local`); they were **not** copied to the cloud, and production builds hide the demo buttons.
@@ -503,7 +504,11 @@ Password rule (scripts and sign-up): at least 8 characters with a letter and a n
 
 **Sign-up approval + cookie login (batch 3):** pending sign-ups approved by admins; HttpOnly cookie login with server-side sessions, real logout, quiet refresh and request-forgery header; API reached on the site's own address (Vercel / Vite forwarding). Tested end to end (21 checks: cookie flags, no token in responses or storage, forgery block, refresh, logout revoking copied cookies, pending / approve / reject, password change ending sessions).
 
-**Still to do:** upload size/type limits and private `/uploads`; more audit events; monitoring alerts; backup / key-rotation checklist.
+**Uploads (#10):** template uploads accept only real Word files — `.docx` name, Word / zip content type, and the file must start like a `.docx` (ZIP signature), so renamed programs or web pages are refused; **10 MB** max, one file per request. Files are saved under a random name in `uploads/templates` (the uploader's file name is only used as the display name). There is **no public `/uploads` address any more** — files are downloaded through `GET /api/v1/templates/:id/file`, which needs a signed-in user, and only files inside `uploads/templates` can be sent. The server's file path is no longer included in API answers (`has_file` instead). Refused uploads are deleted straight away; deleting a template deletes its file. The Templates page checks type and size before uploading, shows the reason when a file is refused, and has a Download button. Tested end to end (16 checks). Note: Render's disk is temporary — uploaded template files disappear on redeploy (database rows stay).
+
+**Audit trail (#12):** every successful change made through the API is recorded by one middleware (`src/middleware/auditTrail.js`, mounted on `/api/v1`): users (create, update, role change), sign-up requests / approvals / rejections, sources (add, edit, delete, Scrape now, Scrape all), live sources (settings, Sync now), keywords, templates (create, upload, edit, delete), tenders (edit, shortlist, tags, comments, fetch details), tender notes (generate, edit, export) and alert settings. Sign-in, sign-out, failed sign-in, locked-out sign-in and sign-in refused for a pending / rejected / deactivated account are recorded in the auth routes. Only successful requests are recorded, after the answer is sent (never slows or breaks a request). **Passwords, tokens, secrets and keys are never stored** — only "(changed)"; long texts are shortened; each entry is capped at ~4 KB. Fixed: failed sign-ins were never saved (the table needs an entity id and they had none). **Audit Log page:** plain-English action names, "Sign-in & sign-up" and "Live source" categories, date filters that work, and **Export** to CSV (current filters, up to 5,000 rows; spreadsheet-formula-safe). Tested end to end (14 checks). Marking alerts as read is not recorded (too noisy).
+
+**Still to do:** monitoring alerts; backup / key-rotation checklist.
 
 
 - `.gitignore` excludes every `.env`, `.env.*`, `*.env` (except `.env.example`), keys, zips, local backups and `.claude/`. Every push was checked for secrets.
@@ -534,6 +539,10 @@ Password rule (scripts and sign-up): at least 8 characters with a letter and a n
 | Signed out on every page load (live site) | The site must call the API on its own address: check `vercel.json` has the `/api/v1/:path*` rewrite to Render and the browser isn't using an old cached version (Ctrl+Shift+R). |
 | New user says "waiting for approval" | Approve them in Admin → Users → Waiting for approval (or set `SIGNUP_AUTO_APPROVE_DOMAINS` for company emails). |
 | Rate limits hit everyone at once on the live site | Set `TRUST_PROXY_HOPS=2` on Render (Vercel + Render are both in front). |
+| Signed out about 15–30 minutes after signing in | The quiet renewal (`/auth/refresh`) must succeed: the site sends `{}` as its body (a bare `null` is refused with 400). Check the browser's network tab for `/auth/refresh`. |
+| "Add keyword" fails with a server error | Older databases had no `keywords.priority` column. The API adds it at start-up (`account.service.js` → `ensureSchema`); restart the API once. |
+| Audit Log shows nothing for an action | Only successful changes are recorded, and reading pages isn't recorded. Entries made in the same second can appear in any order. |
+| Template upload refused | Only real Word `.docx` files up to 10 MB are accepted (the message says which rule failed). |
 | "Too many failed sign-in attempts" | 5 wrong passwords for that email from your network — wait 15 minutes (or restart the API, which clears the counters). |
 | Viewer gets "Insufficient permissions" | Viewers are read-only — an admin can change the role in Admin → Users. |
 | Need sync details (counts, errors) | `/health` is status-only now — use `/api/v1/admin/system-health` while signed in as admin. |
@@ -582,6 +591,14 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 33. **Security hardening (batch 1)** — login lockout + rate limits, server-side password rule, neutral sign-up message, read-only viewers, no internal error details, clean 400/404, status-only public `/health` (details admin-only), security headers on the API and the website.
 34. **Security: dependency updates (batch 2)** — backend vulnerabilities 26 → 3 moderate (critical and all high fixed; zod 4, openai 7, nodemailer 10, node-cron 4, puppeteer-core 25), frontend 18 → 5 (dev-server / browser-only); Node 22.12+ required; tested API flows, GeM sync, OpenAI path, frontend build and `npm ci`.
 35. **Security: sign-up approval + cookie login (batch 3)** — pending sign-ups approved / rejected by admins (alert to admins, filter, role on approval, optional auto-approved domains); login moved from localStorage to HttpOnly cookies with server-side sessions, real logout, quiet refresh and a request-forgery header; API reached through the site's own address (Vercel rewrite / Vite proxy).
+36. **Admin section for admins only** — sidebar Admin section, GeM Now / Scrape Now and `/admin/...` pages limited to admins (the old check never matched, so everyone saw the section); dashboard figures opened to every signed-in user (viewers used to get "Insufficient permissions").
+37. **Security: upload limits + private files (#10)** — template uploads limited to real `.docx` files up to 10 MB with random file names; public `/uploads` removed, signed-in download via `/templates/:id/file`; multer upgraded to 2; Templates page shows refusal reasons and a Download button. Also fixed the quiet sign-in renewal (it sent `null` and got 400, signing users out after the access cookie expired).
+38. **Security: audit trail (#12)** — every successful change recorded centrally (who, what, IP; secrets never stored), sign-in / sign-out / failed / locked-out / refused sign-ins recorded (failed sign-ins were silently lost before), Audit Log page with readable actions, working date filters and CSV export.
+39. **Keyword fix** — "Add keyword" failed on databases without a `keywords.priority` column (the code saves a priority 1–5); the API now adds the column at start-up (default 3).
+
+
+
+
 
 
 

@@ -83,17 +83,24 @@ router.post('/login', async (req, res) => {
             throw new errorHandler_1.AppError('Email is required', 422);
         // Too many wrong passwords for this email from this network → locked for a while
         const locked = loginGuard.lockedMinutes(req, email);
-        if (locked)
+        if (locked) {
+            require('../services/audit.service').logAction(null, 'auth', null, 'login_locked_out', { email: String(email).toLowerCase().slice(0, 120), minutes_left: locked }, req.ip).catch(() => {});
             return res.status(429).json({ detail: `Too many failed sign-in attempts. Please try again in ${locked} minute${locked === 1 ? '' : 's'}.` });
+        }
         try {
             const session = await authService.loginUser(email, data.password, req);
             loginGuard.succeeded(req, email);
             // Tokens go into HttpOnly cookies — never into the page's JavaScript
             cookies.setAccessCookie(res, req, session.access_token);
             cookies.setRefreshCookie(res, req, session.refresh_token);
+            require('../services/audit.service').logAction(session.user?.id, 'auth', session.user?.id, 'login', { role: session.user?.role, browser: String(req.headers['user-agent'] || '').slice(0, 160) }, req.ip).catch(() => {});
             return res.json({ user: session.user, token_type: 'cookie' });
         }
         catch (loginErr) {
+            if (loginErr instanceof errorHandler_1.AppError && loginErr.statusCode === 403) {
+                // Right password but the account can't sign in (pending / rejected / deactivated)
+                require('../services/audit.service').logAction(null, 'auth', null, 'login_blocked', { email: String(email).toLowerCase().slice(0, 120), reason: loginErr.message }, req.ip).catch(() => {});
+            }
             if (loginErr instanceof errorHandler_1.AppError && loginErr.statusCode === 401) {
                 loginGuard.failed(req, email);
                 require('../services/audit.service').logAction?.(null, 'auth', null, 'login_failed', { email: String(email).toLowerCase(), ip: req.ip }, req.ip)?.catch?.(() => {});
@@ -141,6 +148,8 @@ router.post('/logout', async (req, res) => {
             const payload = jwt.decode(token);
             if (payload?.sid) await authService.logoutSession(payload.sid);
         }
+        const who = jwt.decode(jar[cookies.ACCESS] || jar[cookies.REFRESH] || '') || null;
+        if (who?.sub) require('../services/audit.service').logAction(who.sub, 'auth', who.sub, 'logout', null, req.ip).catch(() => {});
     }
     catch (err) {
         console.error('[Auth] logout failed:', err.message);

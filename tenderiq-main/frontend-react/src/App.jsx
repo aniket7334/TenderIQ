@@ -37,7 +37,8 @@ function AdminGuard() {
   const user = useAuth((s) => s.user);
   const role = user?.role;
 
-  if (role === 'admin' || role === 'manager') {
+  // Admin pages: admins only (matches the server, which restricts /admin routes to admins)
+  if (role === 'admin') {
     return (
       <AdminLayout>
         <Outlet />
@@ -50,7 +51,7 @@ function AdminGuard() {
       <Shield className="mb-4 h-12 w-12 text-amber-500" />
       <h2 className="text-xl font-bold text-gray-900">Access Denied</h2>
       <p className="mt-2 text-sm text-gray-500">
-        You need admin or manager privileges to access this page.
+        This area is for administrators only.
       </p>
       <p className="mt-1 text-xs text-gray-400">
         Your current role: <span className="font-medium">{role || 'unknown'}</span>

@@ -39,6 +39,9 @@ async function ensureSchema() {
         user_agent VARCHAR(255) NULL
     )`);
     await ignoreExists('CREATE INDEX idx_user_sessions_user ON user_sessions (user_id)');
+    // Keywords: the code saves a priority (1-5, default 3) but older databases have no
+    // such column, which made every "Add keyword" fail. Added once; no-op afterwards.
+    await ignoreExists('ALTER TABLE keywords ADD COLUMN priority INT NOT NULL DEFAULT 3');
     ready = true;
     console.log('[Accounts] sign-up approval + sessions ready');
 }

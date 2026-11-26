@@ -53,8 +53,9 @@ app.use((req, _res, next) => {
     next();
 });
 
-// ─── Static uploads ─────────────────────────────────────
-app.use('/uploads', express_1.default.static('uploads'));
+// ─── Uploaded files ─────────────────────────────────────
+// Uploaded files are NOT served publicly (no /uploads). Template files are downloaded
+// through GET /api/v1/templates/:id/file, which needs a signed-in user.
 
 // ─── Health Check ───────────────────────────────────────
 app.get('/health', async (_req, res) => {
@@ -84,6 +85,8 @@ app.get('/health', async (_req, res) => {
 });
 
 // ─── API Routes ─────────────────────────────────────────
+// Audit trail: records every successful change (who, what, from where) — see src/middleware/auditTrail.js
+app.use('/api/v1', require('./src/middleware/auditTrail').auditTrail);
 app.use('/api/v1', routes_1.default);
 
 // ─── Not found (JSON, not the framework's HTML page) ────

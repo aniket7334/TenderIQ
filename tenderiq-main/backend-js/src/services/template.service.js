@@ -30,7 +30,7 @@ function rowToTemplate(row) {
     id: row.id,
     name: row.name,
     description: row.description,
-    templateFilePath: row.template_file_path,
+    has_file: !!row.template_file_path,
     templateType: row.template_type,
     placeholders,
     htmlTemplate: row.html_template,
@@ -101,7 +101,8 @@ async function uploadTemplate(file, createdBy) {
     // File may be binary DOCX; placeholders will be empty
   }
 
-  const name = path.parse(file.filename).name;
+  // Name from the uploader's file name (display only — the file on disk has a random name)
+  const name = (path.parse(file.originalname || "").name || "Template").replace(/[\u0000-\u001f]/g, "").slice(0, 200);
   const placeholders = JSON.stringify({ detected });
 
   await pool.query(
@@ -166,6 +167,13 @@ async function updateTemplate(templateId, data) {
   return getTemplate(templateId);
 }
 
+/** Where the template's file is on disk (server only — never sent to the browser). */
+async function getTemplateFilePath(templateId) {
+  const [rows] = await pool.query("SELECT template_file_path FROM note_templates WHERE id = ?", [templateId]);
+  if (rows.length === 0) throw new AppError("Template not found", 404);
+  return rows[0].template_file_path || null;
+}
+
 async function deleteTemplate(templateId) {
   const [existing] = await pool.query(
     "SELECT * FROM note_templates WHERE id = ?",
@@ -210,5 +218,6 @@ module.exports = {
   uploadTemplate,
   updateTemplate,
   deleteTemplate,
+  getTemplateFilePath,
   getPlaceholders,
 };
