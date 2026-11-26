@@ -22,8 +22,8 @@ const REGION = 'World Bank';          // "All World Bank countries"
 const COUNTRY_PREFIX = 'World Bank: '; // "World Bank: Nigeria"
 // How often live sources refresh in the background (minutes). 5 like GeM; much more
 // often gets the server rate-limited (HTTP 429) by TED / Find a Tender.
-const SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
-const REFRESH_MS = SYNC_MS;
+let SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
+let REFRESH_MS = SYNC_MS;
 const FULL_RELOAD_MS = 2 * 60 * 60 * 1000; // between quick syncs, only the newest notices are read
 const OPEN_TYPES = ['Invitation for Bids', 'Request for Expression of Interest', 'Invitation for Prequalification'];
 const LIST_FIELDS = 'id,notice_type,noticedate,submission_deadline_date,submission_deadline_time,project_ctry_name,project_id,project_name,bid_description,bid_reference_no,procurement_group,procurement_method_name,notice_lang_name,contact_organization,contact_address,contact_ctry_name';
@@ -176,6 +176,19 @@ function warmUp() {
         }, REFRESH_MS);
         timer.unref?.();
     }
+}
+
+/** Stop the background refresh (source switched off in Admin → Sources). */
+function stopSync() {
+    if (timer) clearInterval(timer);
+    timer = null;
+}
+
+/** Change the refresh interval (Admin → Sources → Edit). */
+function setSyncMinutes(minutes) {
+    SYNC_MS = Math.min(60, Math.max(2, Number(minutes) || 5)) * 60 * 1000;
+    REFRESH_MS = SYNC_MS;
+    if (timer) { stopSync(); warmUp(); }
 }
 
 async function ready(waitMs = 25000) {
@@ -422,5 +435,5 @@ const status = async () => ({
 
 module.exports = {
     REGION, COUNTRY_PREFIX, isWorldBankRegion, isLiveId: (id) => String(id || '').startsWith(ID_PREFIX),
-    warmUp, searchTenders, getTender, getDocuments, countWorldBank, countries, sourceInfo, status,
+    warmUp, stopSync, setSyncMinutes, searchTenders, getTender, getDocuments, countWorldBank, countries, sourceInfo, status,
 };

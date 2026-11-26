@@ -20,8 +20,8 @@ const ID_PREFIX = 'uk-';
 const WINDOW_DAYS = 180;         // notices updated in this window can still be open
 // How often live sources refresh in the background (minutes). 5 like GeM; much more
 // often gets the server rate-limited (HTTP 429) by TED / Find a Tender.
-const SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
-const REFRESH_MS = SYNC_MS; // only the changes since the last sync (1–2 requests)
+let SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
+let REFRESH_MS = SYNC_MS; // only the changes since the last sync (1–2 requests)
 const PAGE_DELAY_MS = 1100;      // Find a Tender rate-limits fast clients (HTTP 429)
 
 /* ------------------------------------------------------------------ */
@@ -173,6 +173,19 @@ function warmUp() {
         refreshTimer = setInterval(() => sync().catch((e) => console.error('[UK] refresh failed:', e.message)), REFRESH_MS);
         refreshTimer.unref?.();
     }
+}
+
+/** Stop the background refresh (source switched off in Admin → Sources). */
+function stopSync() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = null;
+}
+
+/** Change the refresh interval (Admin → Sources → Edit). */
+function setSyncMinutes(minutes) {
+    SYNC_MS = Math.min(60, Math.max(2, Number(minutes) || 5)) * 60 * 1000;
+    REFRESH_MS = SYNC_MS;
+    if (refreshTimer) { stopSync(); warmUp(); }
 }
 
 /** Make sure there is data to answer with; wait a little on the very first load. */
@@ -390,7 +403,7 @@ async function sourceInfo({ fresh = false } = {}) {
 const isLiveId = (id) => String(id || '').startsWith(ID_PREFIX);
 
 module.exports = {
-    UK, NATIONS, isUkRegion, isLiveId, warmUp,
+    UK, NATIONS, isUkRegion, isLiveId, warmUp, stopSync, setSyncMinutes,
     searchTenders, getTender, getDocuments, countUk, sourceInfo,
 };
 

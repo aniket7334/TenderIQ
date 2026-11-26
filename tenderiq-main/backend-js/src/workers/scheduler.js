@@ -17,12 +17,10 @@ function startScheduler() {
     // column if needed and compute flags right away (Render doesn't run migrate.js)
     require('../services/priority.service').initPriority();
 
-    // UK tenders (Find a Tender): load the in-memory working copy and keep it fresh
-    require('../sources/fts').warmUp();
-    // Europe tenders (TED): refresh the default view every few minutes
-    require('../sources/ted').warmUp();
-    // World Bank notices (worldwide): in-memory working copy, translated titles
-    require('../sources/worldbank').warmUp();
+    // Live sources (TED, Find a Tender, World Bank): background sync for the ones switched on
+    // in Admin → Sources, each at its own interval (src/sources/index.js)
+    require('../sources').init();
+
 
     // Scrape all active sources every 1 hour to check for new tenders
     cron.schedule('0 * * * *', async () => {

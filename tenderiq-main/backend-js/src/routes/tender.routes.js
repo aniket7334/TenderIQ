@@ -55,7 +55,13 @@ router.use((req, res, next) => {
 // GET / - List tenders
 router.get('/', auth_1.authenticate, async (req, res) => {
     // Region "Europe" or a European country → live from TED, nothing stored
-    const liveSource = live.sourceForRegion(req.query.country);
+    const entry = live.entryForRegion(req.query.country);
+    if (entry && !entry.active) {
+        // Source switched off in Admin → Sources
+        return res.json({ items: [], total: 0, page: 1, page_size: 20, total_pages: 1, live_source: entry.id, inactive: true,
+            detail: 'This live source is deactivated. An admin can switch it on again in Admin → Sources.' });
+    }
+    const liveSource = entry?.module;
     if (liveSource) {
         try {
             return res.json(await liveSource.searchTenders({
@@ -146,12 +152,14 @@ router.get('/facets', auth_1.authenticate, async (_req, res) => {
             sectors: sectors.map((r) => ({ sector: r.sector, count: Number(r.count) })),
             regions: india.count ? [{ country: 'India', count: Number(india.count) }] : [],
             // Live count for "All Europe" (TED, not stored); null if TED didn't answer in time
-            europe_total: await ted.countEurope(),
+            europe_total: await live.count('ted'),
             // Live count for "All UK" (Find a Tender, kept in memory, not stored)
-            uk_total: await live.fts.countUk(),
+            uk_total: await live.count('fts'),
             // World Bank (worldwide, kept in memory, not stored): total + countries with open notices
-            worldbank_total: await live.worldbank.countWorldBank(),
-            worldbank_countries: live.worldbank.countries(),
+            worldbank_total: await live.count('worldbank'),
+            worldbank_countries: live.isActive('worldbank') ? live.worldbank.countries() : [],
+            // which live regions are switched on (Admin → Sources)
+            live_active: live.activeMap(),
         });
     }
     catch (err) {

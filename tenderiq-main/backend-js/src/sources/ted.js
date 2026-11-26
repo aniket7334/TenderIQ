@@ -15,8 +15,8 @@ const { AppError } = require('../middleware/errorHandler');
 const TED_SEARCH = 'https://api.ted.europa.eu/v3/notices/search';
 // How often live sources refresh in the background (minutes). 5 like GeM; much more
 // often gets the server rate-limited (HTTP 429) by TED / Find a Tender.
-const SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
-const CACHE_MS = SYNC_MS;
+let SYNC_MS = Math.min(60, Math.max(2, Number(process.env.LIVE_SYNC_MINUTES) || 5)) * 60 * 1000;
+let CACHE_MS = SYNC_MS;
 const ID_PREFIX = 'ted-';
 
 /* ------------------------------------------------------------------ */
@@ -400,6 +400,19 @@ function warmUp() {
     }
 }
 
+/** Stop the background refresh (source switched off in Admin → Sources). */
+function stopSync() {
+    if (syncTimer) clearInterval(syncTimer);
+    syncTimer = null;
+}
+
+/** Change the refresh interval (Admin → Sources → Edit). */
+function setSyncMinutes(minutes) {
+    SYNC_MS = Math.min(60, Math.max(2, Number(minutes) || 5)) * 60 * 1000;
+    CACHE_MS = SYNC_MS;
+    if (syncTimer) { stopSync(); warmUp(); }
+}
+
 /** Small status for /health: open Europe tenders (cached count) and the last TED problem. */
 async function tedHealth() {
     const open_tenders = await countEurope({ waitMs: 8000 });
@@ -410,11 +423,11 @@ async function tedHealth() {
  * TED as a "live source" for the Sources page. `fresh` skips the cache so
  * "Check now" really asks TED (one small request).
  */
-async function sourceInfo({ fresh = false } = {}) {
+async function sourceInfo({ fresh = false, offline = false } = {}) {
     if (fresh) {
         for (const key of cache.keys()) if (key.includes('"limit":1,"page":1')) cache.delete(key);
     }
-    const open_tenders = await countEurope({ waitMs: 12000 });
+    const open_tenders = offline ? null : await countEurope({ waitMs: 12000 });
     const ok = open_tenders != null;
     return {
         id: 'ted',
@@ -457,7 +470,7 @@ async function countEurope({ waitMs = 6000 } = {}) {
 
 module.exports = {
     EUROPE, EUROPE_COUNTRIES, isEuropeRegion, isLiveId,
-    searchTenders, getTender, getDocuments, countEurope, sourceInfo, tedHealth, warmUp,
+    searchTenders, getTender, getDocuments, countEurope, sourceInfo, tedHealth, warmUp, stopSync, setSyncMinutes,
     // for tests
     categoriesFromCpv, categoryClause, tedDate,
     // shared with the UK source (same CPV system)

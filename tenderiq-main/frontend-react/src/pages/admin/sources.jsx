@@ -194,21 +194,56 @@ export default function SourcesPage() {
     }
   };
 
-  // Ask the live sources again now and update their rows
-  const handleCheckLive = async (row) => {
+  /* ---- Live sources (TED, Find a Tender, World Bank): same three buttons as the others ---- */
+  const replaceLive = (info) => setLiveSources((prev) => prev.map((s) => (s.id === info.id ? info : s)));
+
+  // ▶ Sync now — refresh this source immediately (like "Trigger Scrape")
+  const handleSyncLive = async (row) => {
     try {
-      setCheckingLive(true);
-      const res = await api.get('/sources/live', { params: { fresh: 1 }, timeout: 60000 });
-      const items = res.data.items || [];
-      setLiveSources(items);
-      const s = items.find((x) => `live-${x.id}` === row?.id) || items[0];
-      setToast(s?.status === 'online'
-        ? `${s.short_name} is online — ${(s.open_tenders ?? 0).toLocaleString()} open tenders`
-        : `${s?.short_name || 'The source'} is ${s?.status === 'loading' ? 'still loading' : 'not answering'} — try again shortly`);
+      setCheckingLive(row.live_id);
+      const { data } = await api.post(`/sources/live/${row.live_id}/sync`, null, { timeout: 120000 });
+      replaceLive(data);
+      setToast(data.status === 'online'
+        ? `${data.short_name} synced — ${(data.open_tenders ?? 0).toLocaleString()} open tenders`
+        : `${data.short_name} is ${data.status === 'loading' ? 'still loading' : data.status === 'inactive' ? 'deactivated' : 'not answering'} — try again shortly`);
     } catch {
       // handled by interceptor
     } finally {
       setCheckingLive(false);
+    }
+  };
+
+  // Deactivate / Activate
+  const handleToggleLive = async (row) => {
+    try {
+      const { data } = await api.patch(`/sources/live/${row.live_id}`, { is_active: !row.is_active }, { timeout: 60000 });
+      replaceLive(data);
+      setToast(`${row.name} ${row.is_active ? 'deactivated — it no longer syncs or shows in Tenders' : 'activated'}`);
+    } catch {
+      // handled by interceptor
+    }
+  };
+
+  // Edit (sync interval + on/off)
+  const [liveEdit, setLiveEdit] = useState(null);
+  const openLiveEdit = (row) => {
+    const s = liveSources.find((x) => x.id === row.live_id);
+    setLiveEdit({ ...s, form_active: s.is_active, form_minutes: String(s.sync_minutes || '') });
+  };
+  const saveLiveEdit = async () => {
+    try {
+      setSaving(true);
+      const { data } = await api.patch(`/sources/live/${liveEdit.id}`, {
+        is_active: liveEdit.form_active,
+        sync_minutes: liveEdit.form_minutes === '' ? null : Number(liveEdit.form_minutes),
+      }, { timeout: 60000 });
+      replaceLive(data);
+      setLiveEdit(null);
+      setToast(`${data.short_name} updated — syncs every ${data.sync_minutes} minutes${data.is_active ? '' : ' (deactivated)'}`);
+    } catch {
+      // handled by interceptor
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -218,12 +253,14 @@ export default function SourcesPage() {
     ...liveSources.map((s) => ({
       id: `live-${s.id}`,
       live: true,
+      live_id: s.id,
       name: s.short_name,
       adapter_type: s.adapter,
       base_url: s.website,
       region_label: s.region_label,
       open_path: s.open_path,
-      is_active: true,
+      is_active: s.is_active !== false,
+      sync_minutes: s.sync_minutes,
       status: s.status,
       last_scraped_at: s.last_ok_at,
       success_rate: s.success_rate,
@@ -233,6 +270,7 @@ export default function SourcesPage() {
 
   const getStatusBadge = (source) => {
     if (source.live) {
+      if (!source.is_active) return <Badge variant="default">Inactive</Badge>;
       if (source.status === 'online') return <Badge variant="success">Active</Badge>;
       return <Badge variant="default">{source.status === 'busy' ? 'Busy' : source.status === 'loading' ? 'Loading' : 'Unreachable'}</Badge>;
     }
@@ -340,13 +378,19 @@ export default function SourcesPage() {
                       <td className="whitespace-nowrap px-4 py-4 text-right sm:px-6">
                         {source.live ? (
                         <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => openLiveEdit(source)} title="Edit" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => handleToggleLive(source)} title={source.is_active ? 'Deactivate' : 'Activate'} className="hidden sm:inline-flex rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                            {source.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                          </button>
                           <button
-                            onClick={() => handleCheckLive(source)}
-                            disabled={checkingLive}
-                            title={`Check ${source.name} now`}
-                            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+                            onClick={() => handleSyncLive(source)}
+                            disabled={!source.is_active || checkingLive === source.live_id}
+                            title="Sync now"
+                            className="rounded-lg p-2 text-gray-400 hover:bg-green-50 hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
                           >
-                            {checkingLive ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                            {checkingLive === source.live_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                           </button>
                           <button
                             onClick={() => navigate(source.open_path)}
@@ -448,6 +492,66 @@ export default function SourcesPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Live Source Modal (TED, Find a Tender, World Bank) */}
+      <Modal isOpen={!!liveEdit} onClose={() => setLiveEdit(null)} title={`Edit Source - ${liveEdit?.short_name || ''}`} size="lg">
+        {liveEdit && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              Live source — tenders are read from {liveEdit.name} when needed and are <span className="font-medium text-gray-900">not stored</span>.
+              Only these settings are saved.
+            </div>
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-gray-500">Name</dt>
+                <dd className="mt-0.5 text-gray-900">{liveEdit.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Region in Tenders</dt>
+                <dd className="mt-0.5 text-gray-900">{liveEdit.region_label}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-gray-500">Website</dt>
+                <dd className="mt-0.5 break-all font-mono text-xs text-gray-700">{liveEdit.website}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-gray-500">Coverage</dt>
+                <dd className="mt-0.5 text-gray-900">{liveEdit.coverage}</dd>
+              </div>
+            </dl>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Sync Interval (minutes)</label>
+              <Input
+                type="number"
+                min={2}
+                max={60}
+                value={liveEdit.form_minutes}
+                placeholder={String(liveEdit.default_sync_minutes || 5)}
+                onChange={(e) => setLiveEdit({ ...liveEdit, form_minutes: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                2–60 minutes. Empty = default ({liveEdit.default_sync_minutes || 5}). Below 5 minutes the source may rate-limit TenderIQ.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="live_is_active"
+                checked={liveEdit.form_active}
+                onChange={(e) => setLiveEdit({ ...liveEdit, form_active: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="live_is_active" className="text-sm font-medium text-gray-700">
+                Active <span className="font-normal text-gray-500">(off = stops syncing and hides this region in Tenders)</span>
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setLiveEdit(null)}>Cancel</Button>
+              <Button onClick={saveLiveEdit} loading={saving}>Update</Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Scrape History Modal */}

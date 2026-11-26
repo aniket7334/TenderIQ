@@ -173,6 +173,8 @@ function TendersPageContent() {
   const [ukTotal, setUkTotal] = useState(null);
   const [wbTotal, setWbTotal] = useState(null);
   const [wbCountries, setWbCountries] = useState([]);
+  // Which live regions are switched on in Admin → Sources
+  const [liveActive, setLiveActive] = useState({ ted: true, fts: true, worldbank: true });
   const [sectorFacets, setSectorFacets] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -232,7 +234,7 @@ function TendersPageContent() {
 
       const res = await api.get('/tenders', { params });
       setTenders(res.data.items);
-      setLiveInfo(res.data.live_source ? { source: res.data.live_source, defaultSectors: res.data.default_sectors, syncedAt: res.data.synced_at } : null);
+      setLiveInfo(res.data.live_source ? { source: res.data.live_source, defaultSectors: res.data.default_sectors, syncedAt: res.data.synced_at, inactive: !!res.data.inactive, detail: res.data.detail } : null);
       setTotal(res.data.total);
       setTotalPages(res.data.total_pages);
     } catch (err) {
@@ -260,6 +262,7 @@ function TendersPageContent() {
       setUkTotal(res.data.uk_total ?? null);
       setWbTotal(res.data.worldbank_total ?? null);
       setWbCountries(res.data.worldbank_countries || []);
+      if (res.data.live_active) setLiveActive(res.data.live_active);
       setSectorFacets(res.data.sectors || []);
     } catch {
       // non-critical — dropdowns fall back to hardcoded lists
@@ -576,6 +579,7 @@ function TendersPageContent() {
                   })}
                 </optgroup>
               )}
+              {liveActive.ted !== false && (
               <optgroup label="Europe — live from TED">
                 <option value={EUROPE}>
                   🇪🇺 All Europe{europeTotal != null ? ` (${europeTotal.toLocaleString()})` : ''}
@@ -589,6 +593,8 @@ function TendersPageContent() {
                   );
                 })}
               </optgroup>
+              )}
+              {liveActive.fts !== false && (
               <optgroup label="United Kingdom — live from Find a Tender">
                 <option value={UK}>
                   🇬🇧 All UK{ukTotal != null ? ` (${ukTotal.toLocaleString()})` : ''}
@@ -599,6 +605,8 @@ function TendersPageContent() {
                   </option>
                 ))}
               </optgroup>
+              )}
+              {liveActive.worldbank !== false && (
               <optgroup label="Worldwide — live from the World Bank">
                 <option value={WORLD_BANK}>
                   🏦 All World Bank countries{wbTotal != null ? ` (${wbTotal.toLocaleString()})` : ''}
@@ -609,6 +617,7 @@ function TendersPageContent() {
                   </option>
                 ))}
               </optgroup>
+              )}
               {/* No "United Nations" option: UNGM (where UN agencies publish) blocks automated access */}
               <optgroup label="All countries">
                 {ALL_COUNTRIES.filter((c) => !regionFacets.some((r) => r.country === c.value) && !EUROPE_COUNTRY_NAMES.includes(c.value) && c.value !== UK).map((opt) => (
@@ -725,7 +734,10 @@ function TendersPageContent() {
         </div>
       </div>
 
-      {europeMode && (
+      {europeMode && liveInfo?.inactive && (
+        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">{liveInfo.detail}</div>
+      )}
+      {europeMode && !liveInfo?.inactive && (
         <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
           <Globe className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
           <p>

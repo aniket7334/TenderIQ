@@ -186,7 +186,7 @@ Base path: **`/api/v1`**. All routes except auth and `/health` need a `Authoriza
 Changes to live (`ted-`/`uk-`/`wb-`) tenders (shortlist, tags, comments, edits) are refused with a clear message — they aren't stored.
 
 ### Sources — `/sources` (scraping portals)
-`GET /`, `GET /live` (live sources — TED, Find a Tender, World Bank — with status, open tenders, success rate, response time; `?fresh=1` asks again), `POST /`, `POST /scrape-all` (Scrape Now), `POST /scrape-type/:adapter` (GeM Now = `gem`), `GET|PATCH|DELETE /:id`, `POST /:id/scrape`, `GET /:id/runs`
+`GET /`, `PATCH /live/:id` (admin: `{ is_active, sync_minutes }` for `ted` / `fts` / `worldbank`), `POST /live/:id/sync` (admin: refresh now), `GET /live` (live sources — TED, Find a Tender, World Bank — with status, on/off, interval,, open tenders, success rate, response time; `?fresh=1` asks again), `POST /`, `POST /scrape-all` (Scrape Now), `POST /scrape-type/:adapter` (GeM Now = `gem`), `GET|PATCH|DELETE /:id`, `POST /:id/scrape`, `GET /:id/runs`
 
 ### Alerts — `/alerts`
 `GET /` (feed), `GET /unread-count`, `GET /today` (today's new tenders, by category), `PATCH|POST /:id/read`, `POST /mark-all-read`, `POST /:id/delete`, `GET|PATCH /settings` (per-user notification settings)
@@ -233,6 +233,7 @@ MySQL-compatible (XAMPP locally, **TiDB Cloud** in production). Tables are creat
 | `user_preferences` | Notification settings (new tenders, deadlines, reminder days, keywords-only, categories) |
 | `note_templates`, `tender_notes` | AI tender-note templates and generated notes |
 | `audit_logs` | Who did what |
+| `live_source_settings` | On/off and refresh interval of the live sources (TED, Find a Tender, World Bank) — settings only, never tenders; created on start |
 
 Notable indexes: `title_sort`, `created_at`, cost, tag name, `(is_priority, created_at)`, `(is_priority, submission_end_date)`.
 
@@ -272,7 +273,7 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 
 **Detail & how to apply:** procedure, lot titles/descriptions (buyer's language), submission URL, documents URL, buyer email/phone/address/website, English notice PDF (`ted.europa.eu/en/notice/<id>/pdf`) and notice page.
 
-**Background sync:** every `LIVE_SYNC_MINUTES` (default 5) the server refreshes the default Europe view and count, so results are never more than ~5 minutes old (the memory cache lasts the same time). While a live region is open, the Tenders page re-checks every minute (served from that cache — no extra load on TED), shows **"Live · TED synced x min ago"** and announces new tenders.
+**Background sync:** every `LIVE_SYNC_MINUTES` (default 5; each live source can have its own interval or be switched off in Admin → Sources → Edit / Deactivate) the server refreshes the default Europe view and count, so results are never more than ~5 minutes old (the memory cache lasts the same time). While a live region is open, the Tenders page re-checks every minute (served from that cache — no extra load on TED), shows **"Live · TED synced x min ago"** and announces new tenders.
 
 **Totals without storage:** TED returns the number of matching notices with every search, so counts are asked live (cached 10 minutes, never more than 6 s of waiting): the Dashboard's **Total tenders** = India tenders (stored) + Europe tenders (live), shown as "India N · Europe N (live)"; the Region dropdown shows **All Europe (N)** and the Sector field shows the live total for the Europe view or the chosen sector (e.g. Pipeline (312)).
 
@@ -349,7 +350,7 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 | **Tender Notes** | AI-generated tender notes from templates; edit and export. |
 | **Alerts** | Today's new tenders (matching my alerts / all, by category), alert feed (All / Unread / New tenders / Closing soon), mark read, delete, mark all read; link to notification settings. |
 | **Settings** | Account details; **notification settings** (new tender alerts, closing-soon alerts with 1/3/7-day reminder, keywords-only, categories, browser notifications). |
-| **Admin** | Sources — one table: GeM, port trusts (eTenders), CPPP, IREPS (edit, activate, scrape, history, delete) **plus the live sources TED, Find a Tender and World Bank** (adapter TED/FTS/WORLDBANK, website, Active/Busy/Loading, last checked, success rate, "Europe/United Kingdom · live, not stored · N open"; actions: **Check now** and **Open tenders**). Success rate is shown as the API's percentage. Keywords, Templates, Users (roles), Audit log. |
+| **Admin** | Sources — one table: GeM, port trusts (eTenders), CPPP, IREPS (edit, activate, scrape, history, delete) **plus the live sources TED, Find a Tender and World Bank** (adapter TED/FTS/WORLDBANK, website, Active/Inactive/Busy/Loading, last checked, success rate, "Europe/United Kingdom/Worldwide · live, not stored · N open") with the same buttons: **Edit** (sync interval 2–60 min, on/off), **Deactivate / Activate** (off = stops syncing, hides its region in Tenders, leaves the totals) and **▶ Sync now**, plus **Open tenders**. Success rate is shown as the API's percentage. Keywords, Templates, Users (roles), Audit log. |
 
 ---
 
@@ -539,6 +540,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 29. **Worldwide, live from the World Bank** — Region group "Worldwide — live from the World Bank" (all + ~100 countries), ~600 open notices kept in memory (30-min refresh), French/Spanish/Portuguese matched through a built-in glossary and translated with OpenAI when credit is available (paused automatically otherwise), Overview/Documents (full notice text)/How to apply (contact person, email, phone), World Bank in Dashboard total and Sources.
 30. **Region list clean-up** — removed the empty "United Nations" option (UNGM blocks automated access, so there is no UN source); `/health` reports TED reachability (`ted_live`).
 31. **Live sync every 5 minutes for Europe, UK and World Bank** — background refresh like GeM (`LIVE_SYNC_MINUTES`): TED default view, Find a Tender changes, World Bank newest notices (+ full reload every 2 h); Tenders page re-checks every minute in live regions with a "Live · <source> synced x min ago" label and new-tender messages. Every 1 minute was avoided because TED and Find a Tender rate-limit (HTTP 429).
+32. **Edit / Deactivate / Sync now for live sources** — TED, Find a Tender and World Bank rows in Admin → Sources get the same buttons as the scraped sources; settings saved in `live_source_settings`; deactivated sources stop syncing, disappear from the Region list and totals.
+
 
 
 

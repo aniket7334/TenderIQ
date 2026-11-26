@@ -120,7 +120,7 @@ router.get('/dashboard', async (_req, res) => {
 
         // Europe tenders are live from TED (not stored): add their count, never stored
         const liveSources = require('../sources');
-        const [europe_live_total, uk_live_total, worldbank_live_total] = await Promise.all([liveSources.ted.countEurope(), liveSources.fts.countUk(), liveSources.worldbank.countWorldBank()]);
+        const [europe_live_total, uk_live_total, worldbank_live_total] = await Promise.all([liveSources.count('ted'), liveSources.count('fts'), liveSources.count('worldbank')]);
 
         res.json({
             total_tenders: totalR[0].c,

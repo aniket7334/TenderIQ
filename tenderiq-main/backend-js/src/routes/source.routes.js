@@ -101,6 +101,29 @@ router.get('/live', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ detail: 'Could not check live sources' });
     }
 });
+// PATCH /live/:id - Edit a live source (admin): { is_active, sync_minutes }
+router.patch('/live/:id', auth_1.authenticate, (0, auth_1.requireRole)('admin'), async (req, res) => {
+    try {
+        const { is_active, sync_minutes } = req.body || {};
+        const info = await require('../sources').updateSource(req.params.id, { is_active, sync_minutes });
+        if (!info) return res.status(404).json({ detail: 'Unknown live source' });
+        res.json(info);
+    }
+    catch (err) {
+        res.status(500).json({ detail: 'Could not save the live source settings' });
+    }
+});
+// POST /live/:id/sync - Refresh a live source now (admin) — the "Sync now" button
+router.post('/live/:id/sync', auth_1.authenticate, (0, auth_1.requireRole)('admin'), async (req, res) => {
+    try {
+        const info = await require('../sources').syncNow(req.params.id);
+        if (!info) return res.status(404).json({ detail: 'Unknown live source' });
+        res.json(info);
+    }
+    catch (err) {
+        res.status(502).json({ detail: `Sync failed: ${err.message}` });
+    }
+});
 // POST /scrape-type/:adapter - Scrape only the source(s) of one portal, e.g. "gem"
 // (used by the dashboard's "GeM Now" button). Defined before /:source_id routes.
 router.post('/scrape-type/:adapter', auth_1.authenticate, (0, auth_1.requireRole)('admin'), async (req, res) => {
