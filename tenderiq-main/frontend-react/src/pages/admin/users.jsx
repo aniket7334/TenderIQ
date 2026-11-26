@@ -11,6 +11,8 @@ import {
   PowerOff,
   Plus,
   Edit,
+  Check,
+  UserX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +33,8 @@ export default function UsersPage() {
   const navigate = useNavigate();
   const { user: currentUser, isLoading: authLoading } = useAuth();
   const [users, setUsers] = useState([]);
+  // 'all' or 'pending' (sign-ups waiting for approval)
+  const [view, setView] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
@@ -116,6 +120,25 @@ export default function UsersPage() {
       setToast('Role updated');
     } catch { }
   };
+
+  /* ---- Sign-up approval ---- */
+  const handleApprove = async (u) => {
+    try {
+      await api.post(`/admin/users/${u.id}/approve`, { role: u.role || 'viewer' });
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, signup_status: 'approved', is_active: true } : x)));
+      setToast(`${u.full_name} approved as ${(ROLES.find((r) => r.value === (u.role || 'viewer')) || {}).label || u.role}`);
+    } catch { }
+  };
+  const handleReject = async (u) => {
+    if (!confirm(`Reject the sign-up of ${u.full_name} (${u.email})? They won't be able to sign in.`)) return;
+    try {
+      await api.post(`/admin/users/${u.id}/reject`);
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, signup_status: 'rejected', is_active: false } : x)));
+      setToast(`Sign-up of ${u.full_name} rejected`);
+    } catch { }
+  };
+  const pendingCount = users.filter((u) => u.signup_status === 'pending').length;
+  const shown = view === 'pending' ? users.filter((u) => u.signup_status === 'pending') : users;
 
   const handleToggleActive = async (userId, isActive) => {
     try {
@@ -218,6 +241,28 @@ export default function UsersPage() {
         </div>
       </Modal>
 
+      {/* All users / waiting for approval */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          ['all', `All users (${users.length})`],
+          ['pending', `Waiting for approval (${pendingCount})`],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              view === key ? 'border-brand-700 bg-brand-700 text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        {pendingCount > 0 && view !== 'pending' && (
+          <span className="text-xs text-gray-500">New sign-ups can't sign in until you approve them.</span>
+        )}
+      </div>
+
       {/* Table */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         {loading ? (
@@ -232,10 +277,10 @@ export default function UsersPage() {
               <RefreshCw className="h-4 w-4" /> Retry
             </Button>
           </div>
-        ) : users.length === 0 ? (
+        ) : shown.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Users className="mb-3 h-10 w-10 text-gray-300" />
-            <p className="text-sm font-medium text-gray-600">No users found</p>
+            <p className="text-sm font-medium text-gray-600">{view === 'pending' ? 'No sign-ups waiting for approval' : 'No users found'}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -251,7 +296,7 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {users.map((u) => (
+                {shown.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-4 py-4 sm:px-6 sm:whitespace-nowrap">
                       <div className="flex items-center gap-3 min-w-0">
@@ -278,15 +323,39 @@ export default function UsersPage() {
                       </select>
                     </td>
                     <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4">
-                      <Badge variant={u.is_active ? 'success' : 'default'}>
-                        {u.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
+                      {u.signup_status === 'pending' ? (
+                        <Badge variant="info">Pending approval</Badge>
+                      ) : u.signup_status === 'rejected' ? (
+                        <Badge variant="default">Rejected</Badge>
+                      ) : (
+                        <Badge variant={u.is_active ? 'success' : 'default'}>
+                          {u.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      )}
                     </td>
                     <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                       {formatDate(u.created_at)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-right sm:px-6">
                       <div className="flex items-center justify-end gap-1">
+                        {u.signup_status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(u)}
+                              title={`Approve as ${(ROLES.find((r) => r.value === u.role) || {}).label || 'Viewer'} (change the role first if needed)`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              <Check className="h-3.5 w-3.5" /> Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(u)}
+                              title="Reject this sign-up"
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              <UserX className="h-3.5 w-3.5" /> Reject
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => openEditModal(u)}
                           title="Edit user"
@@ -294,7 +363,7 @@ export default function UsersPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </button>
-                        {u.id !== currentUser?.id && (
+                        {u.id !== currentUser?.id && u.signup_status !== 'pending' && (
                           <button
                             onClick={() => handleToggleActive(u.id, u.is_active)}
                             title={u.is_active ? 'Deactivate' : 'Activate'}

@@ -194,7 +194,8 @@ router.get('/audit-logs', async (req, res) => {
 router.get('/users', async (_req, res) => {
     try {
         const [users] = await pool.execute(
-            'SELECT id, email, full_name, role, is_active, created_at, last_login_at FROM users ORDER BY created_at DESC'
+            // Accounts waiting for approval first
+            "SELECT id, email, full_name, role, is_active, signup_status, created_at, last_login_at FROM users ORDER BY (signup_status = 'pending') DESC, created_at DESC"
         );
         res.json(users.map(u => ({
             id: u.id,
@@ -202,6 +203,8 @@ router.get('/users', async (_req, res) => {
             full_name: u.full_name,
             role: u.role,
             is_active: !!u.is_active,
+            // null (older accounts) counts as approved
+            signup_status: u.signup_status || 'approved',
             created_at: u.created_at,
             last_login_at: u.last_login_at,
         })));
@@ -287,6 +290,9 @@ router.patch('/users/:user_id', async (req, res) => {
             vals.push(userId);
             await pool.execute(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, vals);
         }
+        // New password or deactivated → end all of that user's sessions
+        if (password || is_active === false || is_active === 0)
+            await require('../services/account.service').revokeAllSessions(userId);
         const [rows] = await pool.execute(
             'SELECT id, email, full_name, role, is_active, created_at, last_login_at FROM users WHERE id = ?', [userId]
         );
@@ -310,6 +316,45 @@ router.post('/users/:user_id/update', async (req, res) => {
 });
 
 // PATCH /users/:user_id/role
+// POST /users/:id/approve { role } - approve a pending sign-up (role defaults to viewer)
+router.post('/users/:user_id/approve', async (req, res) => {
+    try {
+        const role = req.body?.role || 'viewer';
+        if (!['viewer', 'analyst', 'manager', 'admin'].includes(role))
+            throw new errorHandler_1.AppError('Invalid role', 400);
+        const [r] = await pool.execute(
+            "UPDATE users SET signup_status = 'approved', is_active = 1, role = ?, updated_at = NOW() WHERE id = ?",
+            [role, req.params.user_id]
+        );
+        if (!r.affectedRows) throw new errorHandler_1.AppError('User not found', 404);
+        await auditService.logAction(req.user.id, 'user', req.params.user_id, 'approve_signup', { role }, req.ip).catch(() => {});
+        res.json({ ok: true, signup_status: 'approved', role, is_active: true });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_1.AppError) return res.status(err.statusCode).json({ detail: err.message });
+        console.error('Approve user error:', err);
+        res.status(500).json({ detail: 'Internal server error' });
+    }
+});
+// POST /users/:id/reject - reject a sign-up (account stays, cannot sign in)
+router.post('/users/:user_id/reject', async (req, res) => {
+    try {
+        if (req.params.user_id === req.user.id) throw new errorHandler_1.AppError('You cannot reject your own account', 400);
+        const [r] = await pool.execute(
+            "UPDATE users SET signup_status = 'rejected', is_active = 0, updated_at = NOW() WHERE id = ?",
+            [req.params.user_id]
+        );
+        if (!r.affectedRows) throw new errorHandler_1.AppError('User not found', 404);
+        await require('../services/account.service').revokeAllSessions(req.params.user_id);
+        await auditService.logAction(req.user.id, 'user', req.params.user_id, 'reject_signup', null, req.ip).catch(() => {});
+        res.json({ ok: true, signup_status: 'rejected', is_active: false });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_1.AppError) return res.status(err.statusCode).json({ detail: err.message });
+        console.error('Reject user error:', err);
+        res.status(500).json({ detail: 'Internal server error' });
+    }
+});
 router.patch('/users/:user_id/role', async (req, res) => {
     try {
         const { role, is_active } = req.body;
@@ -329,6 +374,8 @@ router.patch('/users/:user_id/role', async (req, res) => {
             vals.push(userId);
             await pool.execute(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, vals);
         }
+        if (is_active === false || is_active === 0)
+            await require('../services/account.service').revokeAllSessions(userId);
 
         const [rows] = await pool.execute(
             'SELECT id, email, full_name, role, is_active, created_at, last_login_at FROM users WHERE id = ?', [userId]

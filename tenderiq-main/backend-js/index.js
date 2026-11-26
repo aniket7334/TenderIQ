@@ -15,7 +15,8 @@ const security = require('./src/middleware/security');
 const app = (0, express_1.default)();
 // Don't advertise the framework; Render sits in front, so trust its proxy for the real client IP
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+// How many proxies sit in front: Render = 1; Vercel forwarding /api/v1 + Render = 2 (TRUST_PROXY_HOPS)
+app.set('trust proxy', Math.max(0, Number(process.env.TRUST_PROXY_HOPS ?? 1)));
 // Protective headers on every response
 app.use(security.securityHeaders);
 
@@ -96,6 +97,8 @@ const port = config_1.config.app.port;
 const server = app.listen(port, () => {
     console.log(`TenderIQ API server running on http://localhost:${port}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    // Sign-up approval column + login sessions table (Render doesn't run migrate.js)
+    require('./src/services/account.service').ensureSchema().catch((e) => console.error('[Accounts] setup failed:', e.message));
     (0, scheduler_1.startScheduler)();
     // Render's free plan sleeps after 15 minutes without requests, which would
     // also stop the GeM sync. Ping our own public URL so the server stays awake.

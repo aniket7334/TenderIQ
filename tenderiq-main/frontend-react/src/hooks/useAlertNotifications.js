@@ -50,7 +50,7 @@ export default function useAlertNotifications(onOpen) {
   openRef.current = onOpen;
 
   const refresh = useCallback(async () => {
-    if (!localStorage.getItem('tenderiq_token')) return;
+    if (!localStorage.getItem('tenderiq_user')) return; // not signed in
     try {
       const { data } = await api.get('/alerts/unread-count');
       const count = Number(data?.unread || 0);

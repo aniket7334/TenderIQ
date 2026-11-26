@@ -54,3 +54,11 @@ services:
         value: https://tenderiq-theta.vercel.app/api/gem-proxy
       - key: GEM_PROXY_KEY
         sync: false
+      # The website reaches the API through Vercel (/api/v1 is forwarded), so two
+      # proxies sit in front: Vercel + Render. Needed for correct per-user rate limits.
+      - key: TRUST_PROXY_HOPS
+        value: "2"
+      # Optional: company email domains approved automatically at sign-up
+      # (comma-separated, e.g. meka.com). Empty = every sign-up waits for an admin.
+      - key: SIGNUP_AUTO_APPROVE_DOMAINS
+        sync: false

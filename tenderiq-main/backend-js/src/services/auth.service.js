@@ -4,6 +4,7 @@ exports.registerUser = registerUser;
 exports.loginUser = loginUser;
 exports.refreshToken = refreshToken;
 exports.getUserById = getUserById;
+exports.logoutSession = logoutSession;
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
@@ -11,14 +12,30 @@ const { pool } = require("../db");
 const { config } = require("../config");
 const { AppError } = require("../middleware/errorHandler");
 
-function createAccessToken(userId, role) {
-    return jwt.sign({ sub: userId, role, type: 'access' }, config.jwt.secret, { expiresIn: `${config.jwt.accessTokenExpireMinutes}m` });
+const account = require('./account.service');
+
+// Tokens carry the session id (sid): logout / password change revoke the session on the server.
+function createAccessToken(userId, role, sid) {
+    return jwt.sign({ sub: userId, role, sid, type: 'access' }, config.jwt.secret, { expiresIn: `${config.jwt.accessTokenExpireMinutes}m` });
 }
 
-function createRefreshToken(userId) {
-    return jwt.sign({ sub: userId, type: 'refresh' }, config.jwt.secret, { expiresIn: `${config.jwt.refreshTokenExpireDays}d` });
+function createRefreshToken(userId, sid) {
+    return jwt.sign({ sub: userId, sid, type: 'refresh' }, config.jwt.secret, { expiresIn: `${config.jwt.refreshTokenExpireDays}d` });
 }
 
+const publicUser = (u) => ({
+    id: u.id,
+    email: u.email,
+    fullName: u.full_name,
+    role: u.role,
+    avatarUrl: u.avatar_url || null,
+    isActive: !!u.is_active,
+});
+
+/**
+ * Self sign-up. The account waits for an admin's approval (no sign-in yet), unless the
+ * email is on SIGNUP_AUTO_APPROVE_DOMAINS. Returns { pending, message }.
+ */
 async function registerUser(email, password, fullName) {
     const [existing] = await pool.execute(
         'SELECT id FROM users WHERE email = ?',
@@ -32,33 +49,27 @@ async function registerUser(email, password, fullName) {
     const passwordHash = await bcrypt.hash(password, 12);
     const id = uuidv4();
     const now = new Date();
+    const approved = account.isAutoApproved(email);
 
     await pool.execute(
-        `INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_email_verified, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'viewer', 1, 0, ?, ?)`,
-        [id, email, passwordHash, fullName, now, now]
+        `INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_email_verified, signup_status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'viewer', ?, 0, ?, ?, ?)`,
+        [id, email, passwordHash, fullName, approved ? 1 : 0, approved ? 'approved' : 'pending', now, now]
     );
 
-    // New self-registered accounts get the least-privileged role ('viewer');
-    // admins can promote them from the Users page.
+    if (!approved) await account.notifyAdminsOfSignup(fullName, email);
     return {
-        access_token: createAccessToken(id, 'viewer'),
-        refresh_token: createRefreshToken(id),
-        token_type: 'bearer',
-        user: {
-            id,
-            email,
-            fullName,
-            role: 'viewer',
-            avatarUrl: null,
-            isActive: true,
-        },
+        pending: !approved,
+        message: approved
+            ? 'Account created — you can sign in now.'
+            : 'Account created. An administrator will review it; you will be able to sign in once it is approved.',
     };
 }
 
-async function loginUser(email, password) {
+/** Sign in: checks the password, then approval, then opens a session. */
+async function loginUser(email, password, req) {
     const [rows] = await pool.execute(
-        'SELECT id, email, password_hash, full_name, role, avatar_url, is_active, is_email_verified, created_at FROM users WHERE email = ?',
+        'SELECT id, email, password_hash, full_name, role, avatar_url, is_active, is_email_verified, signup_status, created_at FROM users WHERE email = ?',
         [email]
     );
     const user = rows[0];
@@ -72,8 +83,12 @@ async function loginUser(email, password) {
         throw new AppError('Invalid email or password', 401);
     }
 
-    if (!user.is_active) {
-        throw new AppError('Account is inactive', 403);
+    // Only after a correct password, so these don't reveal anything to guessers
+    if (user.signup_status === 'pending') {
+        throw new AppError('Your account is waiting for approval by an administrator.', 403);
+    }
+    if (!user.is_active || user.signup_status === 'rejected') {
+        throw new AppError('This account is not active. Please contact your administrator.', 403);
     }
 
     await pool.execute(
@@ -81,47 +96,50 @@ async function loginUser(email, password) {
         [new Date(), user.id]
     );
 
+    const sid = await account.createSession(user.id, req, config.jwt.refreshTokenExpireDays);
     return {
-        access_token: createAccessToken(user.id, user.role),
-        refresh_token: createRefreshToken(user.id),
-        token_type: 'bearer',
-        user: {
-            id: user.id,
-            email: user.email,
-            fullName: user.full_name,
-            role: user.role,
-            avatarUrl: user.avatar_url,
-            isActive: user.is_active ? true : false,
-        },
+        access_token: createAccessToken(user.id, user.role, sid),
+        refresh_token: createRefreshToken(user.id, sid),
+        session_id: sid,
+        user: publicUser(user),
     };
 }
 
+/** New access token from a refresh token, if its session is still valid. */
 async function refreshToken(refreshTokenStr) {
     try {
         const payload = jwt.verify(refreshTokenStr, config.jwt.secret);
         if (payload.type !== 'refresh') {
             throw new AppError('Invalid token type', 401);
         }
+        if (!(await account.sessionIsValid(payload.sid))) {
+            throw new AppError('Your session has ended. Please sign in again.', 401);
+        }
 
         const [rows] = await pool.execute(
-            'SELECT id, role, is_active FROM users WHERE id = ?',
+            'SELECT id, role, is_active, signup_status FROM users WHERE id = ?',
             [payload.sub]
         );
         const user = rows[0];
 
-        if (!user || !user.is_active) {
+        if (!user || !user.is_active || user.signup_status === 'pending' || user.signup_status === 'rejected') {
             throw new AppError('Invalid token', 401);
         }
+        await account.touchSession(payload.sid);
 
         return {
-            access_token: createAccessToken(user.id, user.role),
-            refresh_token: createRefreshToken(user.id),
-            token_type: 'bearer',
+            access_token: createAccessToken(user.id, user.role, payload.sid),
+            session_id: payload.sid,
         };
     } catch (err) {
         if (err instanceof AppError) throw err;
         throw new AppError('Invalid or expired refresh token', 401);
     }
+}
+
+/** Sign out: end this session on the server. */
+async function logoutSession(sessionId) {
+    await account.revokeSession(sessionId);
 }
 
 async function getUserById(userId) {

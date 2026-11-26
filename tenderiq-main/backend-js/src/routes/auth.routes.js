@@ -40,6 +40,9 @@ const auth_1 = require("../middleware/auth");
 const errorHandler_1 = require("../middleware/errorHandler");
 const router = (0, express_1.Router)();
 const { loginGuard, passwordProblem } = require('../middleware/security');
+const cookies = require('../middleware/cookies');
+const jwt = require('jsonwebtoken');
+const { config } = require('../config');
 const RegisterSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
     password: zod_1.z.string().min(1),
@@ -60,8 +63,9 @@ router.post('/register', async (req, res) => {
         const weak = passwordProblem(data.password);
         if (weak)
             return res.status(422).json({ detail: weak });
-        const tokens = await authService.registerUser(data.email, data.password, data.full_name);
-        res.status(201).json(tokens);
+        // No sign-in here: the account waits for an admin's approval (see account.service.js)
+        const result = await authService.registerUser(data.email, data.password, data.full_name);
+        res.status(201).json(result);
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
@@ -82,9 +86,12 @@ router.post('/login', async (req, res) => {
         if (locked)
             return res.status(429).json({ detail: `Too many failed sign-in attempts. Please try again in ${locked} minute${locked === 1 ? '' : 's'}.` });
         try {
-            const tokens = await authService.loginUser(email, data.password);
+            const session = await authService.loginUser(email, data.password, req);
             loginGuard.succeeded(req, email);
-            return res.json(tokens);
+            // Tokens go into HttpOnly cookies — never into the page's JavaScript
+            cookies.setAccessCookie(res, req, session.access_token);
+            cookies.setRefreshCookie(res, req, session.refresh_token);
+            return res.json({ user: session.user, token_type: 'cookie' });
         }
         catch (loginErr) {
             if (loginErr instanceof errorHandler_1.AppError && loginErr.statusCode === 401) {
@@ -104,17 +111,42 @@ router.post('/login', async (req, res) => {
 });
 router.post('/refresh', async (req, res) => {
     try {
-        const data = RefreshSchema.parse(req.body);
-        const tokens = await authService.refreshToken(data.refresh_token);
-        res.json(tokens);
+        const fromCookie = cookies.parseCookies(req)[cookies.REFRESH];
+        if (fromCookie && !cookies.hasAppHeader(req))
+            return res.status(403).json({ detail: 'Request blocked (missing TenderIQ header).' });
+        const token = fromCookie || RefreshSchema.parse(req.body || {}).refresh_token;
+        const result = await authService.refreshToken(token);
+        cookies.setAccessCookie(res, req, result.access_token);
+        res.json({ ok: true });
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)
-            return res.status(422).json({ detail: err.issues });
-        if (err instanceof errorHandler_1.AppError)
+            return res.status(401).json({ detail: 'Not signed in' });
+        if (err instanceof errorHandler_1.AppError) {
+            if (err.statusCode === 401) cookies.clearAuthCookies(res, req);
             return res.status(err.statusCode).json({ detail: err.message });
+        }
         res.status(500).json({ detail: 'Internal server error' });
     }
+});
+// POST /logout - end this session on the server and clear the cookies
+router.post('/logout', async (req, res) => {
+    try {
+        const jar = cookies.parseCookies(req);
+        if ((jar[cookies.ACCESS] || jar[cookies.REFRESH]) && !cookies.hasAppHeader(req))
+            return res.status(403).json({ detail: 'Request blocked (missing TenderIQ header).' });
+        for (const token of [jar[cookies.ACCESS], jar[cookies.REFRESH]]) {
+            if (!token) continue;
+            // Even an expired token still names its session — end it
+            const payload = jwt.decode(token);
+            if (payload?.sid) await authService.logoutSession(payload.sid);
+        }
+    }
+    catch (err) {
+        console.error('[Auth] logout failed:', err.message);
+    }
+    cookies.clearAuthCookies(res, req);
+    res.json({ ok: true });
 });
 router.get('/me', auth_1.authenticate, async (req, res) => {
     try {

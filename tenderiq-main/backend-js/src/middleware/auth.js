@@ -6,16 +6,31 @@ const jwt = require("jsonwebtoken");
 const { pool } = require('../db');
 const { config } = require("../config");
 
+const cookies = require('./cookies');
+const account = require('../services/account.service');
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 async function authenticate(req, res, next) {
     try {
+        // The website sends the login in an HttpOnly cookie; scripts / tools may still use a Bearer header
+        const fromCookie = cookies.parseCookies(req)[cookies.ACCESS];
         const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
+        const token = fromCookie || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null);
+        if (!token) {
             return res.status(401).json({ detail: 'Not authenticated' });
         }
-        const token = authHeader.substring(7);
+        // Cookie logins: changes must come from TenderIQ's own pages (request-forgery protection)
+        if (fromCookie && !SAFE_METHODS.has(req.method) && !cookies.hasAppHeader(req)) {
+            return res.status(403).json({ detail: 'Request blocked (missing TenderIQ header).' });
+        }
         const payload = jwt.verify(token, config.jwt.secret);
-        if (payload.type !== 'access') {
+        if (payload.type !== 'access' || !payload.sid) {
             return res.status(401).json({ detail: 'Invalid token type' });
+        }
+        // Logged out / password changed / deactivated → the session is revoked on the server
+        if (!(await account.sessionIsValid(payload.sid))) {
+            return res.status(401).json({ detail: 'Your session has ended. Please sign in again.' });
         }
         const [rows] = await pool.execute(
             'SELECT id, email, full_name, role, is_active FROM users WHERE id = ?',
@@ -30,6 +45,7 @@ async function authenticate(req, res, next) {
             fullName: rows[0].full_name,
             role: rows[0].role,
             isActive: rows[0].is_active,
+            sessionId: payload.sid,
         };
         next();
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import useAlertNotifications from '@/hooks/useAlertNotifications';
+import useAuth from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -113,10 +114,9 @@ export default function AppLayout({ children }) {
     if (pathname.startsWith('/tenders') && urlSearch) navigate('/tenders');
   };
 
+  // Ends the session on the server too (useAuth.logout → POST /auth/logout)
   const handleLogout = () => {
-    localStorage.removeItem('tenderiq_token');
-    localStorage.removeItem('tenderiq_user');
-    navigate('/login');
+    useAuth.getState().logout();
   };
 
   const isActive = (href) => {

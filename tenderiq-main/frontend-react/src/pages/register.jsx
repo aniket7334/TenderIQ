@@ -93,6 +93,8 @@ export default function RegisterPage() {
   const registerAction = useAuth((s) => s.register);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState(null);
+  // After sign-up: the account waits for an admin's approval (no automatic sign-in)
+  const [done, setDone] = useState(null);
 
   const {
     register,
@@ -109,12 +111,12 @@ export default function RegisterPage() {
   const onSubmit = async (data) => {
     setServerError(null);
     try {
-      await registerAction({
+      const result = await registerAction({
         fullName: data.fullName.trim(),
         email: data.email.trim().toLowerCase(),
         password: data.password,
       });
-      navigate('/dashboard');
+      setDone({ ...result, email: data.email.trim().toLowerCase() });
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Could not create your account. Please try again.');
     }
@@ -144,6 +146,25 @@ export default function RegisterPage() {
         </p>
       }
     >
+      {done ? (
+        <div className="space-y-5" role="status">
+          <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{done.pending ? 'Account created — waiting for approval' : 'Account created'}</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">{done.message}</p>
+              {done.pending && (
+                <p className="mt-2 text-xs text-gray-500">
+                  We registered <span className="font-medium text-gray-700">{done.email}</span>. Try signing in after an administrator has approved it.
+                </p>
+              )}
+            </div>
+          </div>
+          <Button type="button" className="w-full" onClick={() => navigate('/login')}>
+            Go to sign in
+          </Button>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
         {serverError && (
           <div
@@ -237,9 +258,10 @@ export default function RegisterPage() {
 
         <p className="flex items-start gap-2 rounded-xl bg-brand-50/70 px-3.5 py-3 text-xs leading-relaxed text-brand-900/80">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
-          New accounts start with view access. An admin can upgrade your role from the Users page.
+          New accounts are reviewed by an administrator before you can sign in. You start with view access; an admin can change your role.
         </p>
       </form>
+      )}
     </AuthLayout>
   );
 }

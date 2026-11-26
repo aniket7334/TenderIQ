@@ -1,127 +1,97 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
 
+/*
+ * Sign-in state. The login itself lives in HttpOnly cookies set by the API —
+ * no token is ever stored in (or readable by) JavaScript. Only the user's
+ * profile (name, email, role) is cached here so pages can render straight away;
+ * it is re-checked with the server (/auth/me) on every load.
+ */
+
+const USER_KEY = 'tenderiq_user';
+// Remove the old token key left by earlier versions (tokens used to live in localStorage)
+try {
+  localStorage.removeItem('tenderiq_token');
+} catch {
+  /* ignore */
+}
+
 function getInitialUser() {
   try {
-    const cached = localStorage.getItem('tenderiq_user');
+    const cached = localStorage.getItem(USER_KEY);
     if (!cached) return null;
     const parsed = JSON.parse(cached);
-    // Reject stale cache missing required fields (e.g. role from older schema)
     if (!parsed || !parsed.role) {
-      localStorage.removeItem('tenderiq_user');
-      localStorage.removeItem('tenderiq_token');
+      localStorage.removeItem(USER_KEY);
       return null;
     }
     return parsed;
   } catch {
-    localStorage.removeItem('tenderiq_user');
+    localStorage.removeItem(USER_KEY);
     return null;
   }
 }
 
 const initialUser = getInitialUser();
-const initialToken = initialUser ? localStorage.getItem('tenderiq_token') : null;
 
 const useAuth = create((set) => ({
   user: initialUser,
-  token: initialToken,
-  isAuthenticated: !!(initialUser && initialToken),
-  isLoading: !!(initialToken && !initialUser),
+  isAuthenticated: !!initialUser,
+  isLoading: false,
 
   login: async (credentials) => {
     const response = await api.post('/auth/login', {
       email: credentials.email,
       password: credentials.password,
     });
-
-    const { access_token, user } = response.data;
-
-    localStorage.setItem('tenderiq_token', access_token);
-    localStorage.setItem('tenderiq_user', JSON.stringify(user));
-
-    set({
-      user,
-      token: access_token,
-      isAuthenticated: true,
-      isLoading: false,
-    });
+    const { user } = response.data;
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    set({ user, isAuthenticated: true, isLoading: false });
   },
 
+  /** Sign-up: the account waits for an admin's approval. Returns { pending, message }. */
   register: async ({ fullName, email, password }) => {
     const response = await api.post('/auth/register', {
       full_name: fullName,
       email,
       password,
     });
-
-    const { access_token, user } = response.data;
-
-    localStorage.setItem('tenderiq_token', access_token);
-    localStorage.setItem('tenderiq_user', JSON.stringify(user));
-
-    set({
-      user,
-      token: access_token,
-      isAuthenticated: true,
-      isLoading: false,
-    });
+    return response.data;
   },
 
-  logout: () => {
-    localStorage.removeItem('tenderiq_token');
-    localStorage.removeItem('tenderiq_user');
-
-    set({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-    });
-
+  /** Sign out: ends the session on the server (the cookies stop working everywhere). */
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      /* still sign out locally */
+    }
+    localStorage.removeItem(USER_KEY);
+    set({ user: null, isAuthenticated: false, isLoading: false });
     window.location.href = '/login';
   },
 
-  loadUser: async () => {
-    const token = localStorage.getItem('tenderiq_token');
+  /** Clear local state only (used when the server says the session has ended). */
+  clearSession: () => {
+    localStorage.removeItem(USER_KEY);
+    set({ user: null, isAuthenticated: false, isLoading: false });
+  },
 
-    if (!token) {
-      set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+  /** Ask the server who is signed in (the cookie decides). */
+  loadUser: async () => {
+    if (!localStorage.getItem(USER_KEY)) {
+      set({ user: null, isAuthenticated: false, isLoading: false });
       return;
     }
-
     try {
       const response = await api.get('/auth/me');
       const user = response.data;
-
-      localStorage.setItem('tenderiq_user', JSON.stringify(user));
-
-      set({
-        user,
-        token,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      set({ user, isAuthenticated: true, isLoading: false });
     } catch {
-      const cachedUser = localStorage.getItem('tenderiq_user');
-      if (cachedUser) {
-        try {
-          const user = JSON.parse(cachedUser);
-          // Only trust cache if it has required fields
-          if (user?.role) {
-            set({
-              user,
-              token,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-            return;
-          }
-        } catch {}
-      }
-
-      localStorage.removeItem('tenderiq_token');
-      localStorage.removeItem('tenderiq_user');
-      set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+      // Not signed in any more (expired / logged out elsewhere) — the API helper redirects
+      localStorage.removeItem(USER_KEY);
+      set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
 }));

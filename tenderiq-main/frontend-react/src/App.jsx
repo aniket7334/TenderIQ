@@ -23,8 +23,9 @@ import { Button } from './components/ui/button';
 import { Link } from 'react-router-dom';
 
 function ProtectedRoute() {
-  const token = localStorage.getItem('tenderiq_token');
-  if (!token) return <Navigate to="/login" replace />;
+  // Signed in = the server confirmed the login cookie (useAuth.loadUser); no token in JavaScript
+  const user = useAuth((s) => s.user);
+  if (!user) return <Navigate to="/login" replace />;
   return (
     <AppLayout>
       <Outlet />
