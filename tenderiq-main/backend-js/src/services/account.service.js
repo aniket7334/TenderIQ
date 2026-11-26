@@ -42,8 +42,57 @@ async function ensureSchema() {
     // Keywords: the code saves a priority (1-5, default 3) but older databases have no
     // such column, which made every "Add keyword" fail. Added once; no-op afterwards.
     await ignoreExists('ALTER TABLE keywords ADD COLUMN priority INT NOT NULL DEFAULT 3');
+    // Readable unique user IDs (USR-0001, USR-0002 ...) — see assignUserCode below
+    await ignoreExists('ALTER TABLE users ADD COLUMN user_code VARCHAR(16) NULL');
+    await ignoreExists('CREATE UNIQUE INDEX uq_users_user_code ON users (user_code)');
+    await assignMissingUserCodes();
     ready = true;
-    console.log('[Accounts] sign-up approval + sessions ready');
+    console.log('[Accounts] sign-up approval + sessions + user IDs ready');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Readable user IDs                                                  */
+/* ------------------------------------------------------------------ */
+/*
+ * Every user gets a permanent, unique, human-readable ID: USR-0001, USR-0002 ...
+ * (in order of joining). It never changes; users are deactivated rather than deleted,
+ * so a number is not handed out twice. The internal UUID (users.id) stays the real key; the code is for people:
+ * Users page, Audit Log, exports. The unique index guarantees no two users share one.
+ */
+const USER_CODE_PREFIX = 'USR-';
+
+async function nextUserCodeNumber() {
+    const [[row]] = await pool.query(
+        `SELECT COALESCE(MAX(CAST(SUBSTRING(user_code, ${USER_CODE_PREFIX.length + 1}) AS UNSIGNED)), 0) AS n
+           FROM users WHERE user_code LIKE ?`, [`${USER_CODE_PREFIX}%`]);
+    return Number(row.n) + 1;
+}
+
+/** Give one user their ID if they don't have one yet. Returns the user's code. */
+async function assignUserCode(userId) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const [[u]] = await pool.query('SELECT user_code FROM users WHERE id = ?', [userId]);
+        if (!u) return null;
+        if (u.user_code) return u.user_code;
+        const code = USER_CODE_PREFIX + String(await nextUserCodeNumber()).padStart(4, '0');
+        try {
+            await pool.query('UPDATE users SET user_code = ? WHERE id = ? AND user_code IS NULL', [code, userId]);
+        }
+        catch (err) {
+            // Two sign-ups at the same moment picked the same number — try the next one
+            if (err.code === 'ER_DUP_ENTRY' || /Duplicate/i.test(err.message)) continue;
+            throw err;
+        }
+    }
+    const [[u]] = await pool.query('SELECT user_code FROM users WHERE id = ?', [userId]);
+    return u?.user_code || null;
+}
+
+/** Give IDs to every user who has none (existing accounts, oldest first). */
+async function assignMissingUserCodes() {
+    const [rows] = await pool.query('SELECT id FROM users WHERE user_code IS NULL ORDER BY created_at, id');
+    for (const r of rows) await assignUserCode(r.id);
+    if (rows.length) console.log(`[Accounts] gave user IDs to ${rows.length} user(s)`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -117,7 +166,7 @@ async function revokeAllSessions(userId) {
 }
 
 module.exports = {
-    ensureSchema, isReady: () => ready,
+    ensureSchema, isReady: () => ready, assignUserCode,
     isAutoApproved, notifyAdminsOfSignup,
     createSession, sessionIsValid, touchSession, revokeSession, revokeAllSessions,
 };

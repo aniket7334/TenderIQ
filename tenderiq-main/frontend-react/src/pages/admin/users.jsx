@@ -305,6 +305,8 @@ export default function UsersPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-gray-900">{u.full_name}</p>
+                          {/* Readable unique user ID — the same ID appears in the Audit Log */}
+                          {u.user_code && <p className="font-mono text-xs text-gray-500">{u.user_code}</p>}
                           <p className="truncate text-xs text-gray-500 md:hidden">{u.email}</p>
                         </div>
                       </div>

@@ -179,13 +179,15 @@ export default function AuditLogPage() {
         if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
-      const lines = [['Time', 'User', 'Action', 'Entity type', 'Entity ID', 'IP address', 'Details'].join(',')];
+      const lines = [['Time', 'User', 'User ID', 'Action', 'Entity type', 'Item', 'Item ID', 'IP address', 'Details'].join(',')];
       for (const r of rows) {
         lines.push([
           formatDate(r.created_at, 'yyyy-MM-dd HH:mm:ss'),
           r.user_name || 'System',
+          r.user_code || '',
           actionLabel(r.action),
           r.entity_type,
+          [r.item_code, r.item_label].filter(Boolean).join(' · '),
           r.entity_id || '',
           r.ip_address || '',
           r.changes ? JSON.stringify(r.changes) : '',
@@ -277,7 +279,7 @@ export default function AuditLogPage() {
               >
                 <option value="">All Users</option>
                 {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.full_name}</option>
+                  <option key={u.id} value={u.id}>{u.user_code ? `${u.user_code} · ${u.full_name}` : u.full_name}</option>
                 ))}
               </select>
             </div>
@@ -341,7 +343,7 @@ export default function AuditLogPage() {
                     <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
                     <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Action</th>
                     <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Entity Type</th>
-                    <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Entity ID</th>
+                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Item</th>
                     <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">IP Address</th>
                   </tr>
                 </thead>
@@ -350,9 +352,10 @@ export default function AuditLogPage() {
                     <React.Fragment key={log.id}>
                       <tr className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-2 py-4 sm:px-3">
-                          {log.changes && Object.keys(log.changes).length > 0 && (
+                          {(log.entity_id || log.user_code || (log.changes && Object.keys(log.changes).length > 0)) && (
                             <button
                               onClick={() => toggleRow(log.id)}
+                              title="Show details"
                               className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                             >
                               <ChevronDown
@@ -366,11 +369,15 @@ export default function AuditLogPage() {
                         <td className="px-3 py-4 text-xs text-gray-600 sm:px-6 sm:whitespace-nowrap sm:text-sm">
                           {formatDate(log.created_at, 'dd MMM yyyy HH:mm:ss')}
                           <div className="mt-1 text-xs text-gray-500 md:hidden">
-                            {log.user_name || (log.user_id ? users.find((u) => String(u.id) === log.user_id)?.full_name : null) || log.user_id || 'System'}
+                            {log.user_name || 'System'}{log.user_code ? ` · ${log.user_code}` : ''}
                           </div>
                         </td>
                         <td className="hidden md:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                          {log.user_name || (log.user_id ? users.find((u) => String(u.id) === log.user_id)?.full_name : null) || log.user_id || 'System'}
+                          {log.user_name || 'System'}
+                          {/* Readable unique user ID (USR-0001 ...) — tells apart people with the same name */}
+                          {log.user_code && (
+                            <span className="mt-0.5 block font-mono text-xs text-gray-500">{log.user_code}</span>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 sm:px-6">
                           {getActionBadge(log.action)}
@@ -378,21 +385,46 @@ export default function AuditLogPage() {
                         <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4">
                           <Badge variant="default">{(ENTITY_TYPE_OPTIONS.find((o) => o.value === log.entity_type) || {}).label || log.entity_type}</Badge>
                         </td>
-                        <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm font-mono text-gray-600">
-                          {log.entity_id ? `${String(log.entity_id).slice(0, 8)}...` : '-'}
+                        {/* The item the action was done to, by name (full ID on hover and in the details) */}
+                        <td className="hidden md:table-cell max-w-[260px] px-6 py-4 text-sm text-gray-700" title={log.entity_id ? `ID: ${log.entity_id}` : undefined}>
+                          {log.item_label || log.item_code ? (
+                            <>
+                              {log.item_code && <span className="block font-mono text-xs text-gray-500">{log.item_code}</span>}
+                              <span className="block truncate">{log.item_label}</span>
+                            </>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                           {log.ip_address || '-'}
                         </td>
                       </tr>
-                      {expandedRows.has(log.id) && log.changes && (
+                      {expandedRows.has(log.id) && (
                         <tr>
                           <td colSpan={7} className="bg-gray-50 px-4 py-3 sm:px-10">
                             <div className="rounded-lg bg-white border border-gray-200 p-3 sm:p-4">
-                              <h4 className="mb-2 text-xs font-semibold uppercase text-gray-400">Changes</h4>
-                              <pre className="overflow-x-auto text-xs text-gray-600 font-mono">
-                                {JSON.stringify(log.changes, null, 2)}
-                              </pre>
+                              <dl className="mb-3 grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
+                                <dt className="font-semibold uppercase text-gray-400">Done by</dt>
+                                <dd className="text-gray-700">
+                                  {log.user_name || 'System'}
+                                  {log.user_code && <span className="ml-1 font-mono text-gray-500">({log.user_code})</span>}
+                                </dd>
+                                <dt className="font-semibold uppercase text-gray-400">Item</dt>
+                                <dd className="text-gray-700">
+                                  {[log.item_code, log.item_label].filter(Boolean).join(' · ') || '—'}
+                                </dd>
+                                <dt className="font-semibold uppercase text-gray-400">Item ID</dt>
+                                <dd className="break-all font-mono text-gray-500">{log.entity_id || '—'}</dd>
+                              </dl>
+                              {log.changes && Object.keys(log.changes).length > 0 && (
+                                <>
+                                  <h4 className="mb-2 text-xs font-semibold uppercase text-gray-400">Changes</h4>
+                                  <pre className="overflow-x-auto text-xs text-gray-600 font-mono">
+                                    {JSON.stringify(log.changes, null, 2)}
+                                  </pre>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>

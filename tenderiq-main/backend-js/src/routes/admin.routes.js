@@ -199,10 +199,11 @@ router.get('/users', async (_req, res) => {
     try {
         const [users] = await pool.execute(
             // Accounts waiting for approval first
-            "SELECT id, email, full_name, role, is_active, signup_status, created_at, last_login_at FROM users ORDER BY (signup_status = 'pending') DESC, created_at DESC"
+            "SELECT id, user_code, email, full_name, role, is_active, signup_status, created_at, last_login_at FROM users ORDER BY (signup_status = 'pending') DESC, created_at DESC"
         );
         res.json(users.map(u => ({
             id: u.id,
+            user_code: u.user_code || null,
             email: u.email,
             full_name: u.full_name,
             role: u.role,
@@ -243,12 +244,13 @@ router.post('/users', async (req, res) => {
             'INSERT INTO users (id, email, password_hash, full_name, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
             [id, email, hashedPassword, full_name, role || 'viewer', true]
         );
+        await require('../services/account.service').assignUserCode(id).catch((e) => console.error('[Accounts] user ID not assigned:', e.message));
         const [rows] = await pool.execute(
-            'SELECT id, email, full_name, role, is_active, created_at, last_login_at FROM users WHERE id = ?', [id]
+            'SELECT id, user_code, email, full_name, role, is_active, created_at, last_login_at FROM users WHERE id = ?', [id]
         );
         const u = rows[0];
         res.status(201).json({
-            id: u.id, email: u.email, full_name: u.full_name, role: u.role,
+            id: u.id, user_code: u.user_code, email: u.email, full_name: u.full_name, role: u.role,
             is_active: !!u.is_active, created_at: u.created_at, last_login_at: u.last_login_at,
         });
     }

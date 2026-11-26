@@ -27,6 +27,7 @@ const publicUser = (u) => ({
     id: u.id,
     email: u.email,
     fullName: u.full_name,
+    userCode: u.user_code || null,
     role: u.role,
     avatarUrl: u.avatar_url || null,
     isActive: !!u.is_active,
@@ -56,6 +57,7 @@ async function registerUser(email, password, fullName) {
          VALUES (?, ?, ?, ?, 'viewer', ?, 0, ?, ?, ?)`,
         [id, email, passwordHash, fullName, approved ? 1 : 0, approved ? 'approved' : 'pending', now, now]
     );
+    await account.assignUserCode(id).catch((e) => console.error('[Accounts] user ID not assigned:', e.message));
 
     if (!approved) await account.notifyAdminsOfSignup(fullName, email);
     return {
@@ -69,7 +71,7 @@ async function registerUser(email, password, fullName) {
 /** Sign in: checks the password, then approval, then opens a session. */
 async function loginUser(email, password, req) {
     const [rows] = await pool.execute(
-        'SELECT id, email, password_hash, full_name, role, avatar_url, is_active, is_email_verified, signup_status, created_at FROM users WHERE email = ?',
+        'SELECT id, user_code, email, password_hash, full_name, role, avatar_url, is_active, is_email_verified, signup_status, created_at FROM users WHERE email = ?',
         [email]
     );
     const user = rows[0];
@@ -144,7 +146,7 @@ async function logoutSession(sessionId) {
 
 async function getUserById(userId) {
     const [rows] = await pool.execute(
-        'SELECT id, email, full_name, role, avatar_url, is_active, is_email_verified, oauth_provider, last_login_at, created_at FROM users WHERE id = ?',
+        'SELECT id, user_code, email, full_name, role, avatar_url, is_active, is_email_verified, oauth_provider, last_login_at, created_at FROM users WHERE id = ?',
         [userId]
     );
     const user = rows[0];
@@ -155,6 +157,7 @@ async function getUserById(userId) {
         id: user.id,
         email: user.email,
         fullName: user.full_name,
+        userCode: user.user_code || null,
         role: user.role,
         avatarUrl: user.avatar_url,
         isActive: user.is_active ? true : false,

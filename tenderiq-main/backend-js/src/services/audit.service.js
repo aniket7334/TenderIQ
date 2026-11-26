@@ -41,6 +41,78 @@ async function logAction(userId, entityType, entityId, action, changes, ipAddres
   };
 }
 
+/*
+ * Readable names for audit entries. entity_id is the database ID of the item an action
+ * was done to (a UUID for users, tenders, templates, keywords, sources, notes; "ted" /
+ * "fts" / "worldbank" for live sources; '' when there is no item, e.g. scrape-all).
+ * These lookups turn it into something a person can read: "USR-0003 · Priya Sharma",
+ * "GEM/2026/B/123 · Supply of ...", "Template: Bid note". Items deleted since are named
+ * from what the entry itself recorded, marked "(deleted)".
+ */
+const LIVE_SOURCE_NAMES = { ted: 'Europe (TED)', fts: 'UK (Find a Tender)', worldbank: 'World Bank' };
+const LOOKUPS = {
+  user: ['SELECT id, user_code, full_name FROM users WHERE id IN (?)', (r) => ({ code: r.user_code, label: r.full_name })],
+  tender: ['SELECT id, reference_no, title FROM tenders WHERE id IN (?)', (r) => ({ code: r.reference_no, label: r.title })],
+  template: ['SELECT id, name FROM note_templates WHERE id IN (?)', (r) => ({ label: r.name })],
+  keyword: ['SELECT id, keyword, category FROM keywords WHERE id IN (?)', (r) => ({ label: `${r.keyword} (${r.category})` })],
+  source: ['SELECT id, name FROM tender_sources WHERE id IN (?)', (r) => ({ label: r.name })],
+  tender_note: ['SELECT n.id, t.reference_no, t.title FROM tender_notes n LEFT JOIN tenders t ON t.id = n.tender_id WHERE n.id IN (?)', (r) => ({ code: r.reference_no, label: r.title ? `Note for ${r.title}` : 'Tender note' })],
+};
+// Sign-in entries are about a person: look the user up
+const LOOKUP_TYPE = { auth: 'user' };
+
+function nameFromChanges(changes) {
+  if (!changes || typeof changes !== 'object') return null;
+  return changes.name || changes.full_name || changes.keyword || changes.file_name || changes.email || null;
+}
+
+async function describeItems(rows) {
+  const ids = {};
+  for (const r of rows) {
+    const type = LOOKUP_TYPE[r.entity_type] || r.entity_type;
+    if (r.entity_id && LOOKUPS[type]) (ids[type] = ids[type] || new Set()).add(r.entity_id);
+  }
+  const found = {};
+  for (const [type, set] of Object.entries(ids)) {
+    const [sql, map] = LOOKUPS[type];
+    try {
+      const [res] = await pool.query(sql, [[...set]]);
+      for (const x of res) found[`${type}:${x.id}`] = map(x);
+    }
+    catch (err) {
+      console.error('[Audit] could not name', type, err.message);
+    }
+  }
+  // Items deleted since: borrow the name from that item's other entries (e.g. its creation)
+  const earlierNames = {};
+  const missing = rows
+    .filter((r) => r.entity_id && LOOKUPS[LOOKUP_TYPE[r.entity_type] || r.entity_type])
+    .filter((r) => !found[`${LOOKUP_TYPE[r.entity_type] || r.entity_type}:${r.entity_id}`])
+    .map((r) => r.entity_id);
+  if (missing.length) {
+    try {
+      const [res] = await pool.query(
+        'SELECT entity_id, changes FROM audit_logs WHERE entity_id IN (?) AND changes IS NOT NULL ORDER BY created_at', [[...new Set(missing)]]);
+      for (const x of res) {
+        const name = nameFromChanges(parseJsonColumn(x.changes));
+        if (name && !earlierNames[x.entity_id]) earlierNames[x.entity_id] = name;
+      }
+    }
+    catch (err) {
+      console.error('[Audit] could not name deleted items', err.message);
+    }
+  }
+  return (r, changes) => {
+    if (!r.entity_id) return { code: null, label: null };
+    if (r.entity_type === 'live_source') return { code: r.entity_id, label: LIVE_SOURCE_NAMES[r.entity_id] || r.entity_id };
+    const type = LOOKUP_TYPE[r.entity_type] || r.entity_type;
+    const hit = found[`${type}:${r.entity_id}`];
+    if (hit) return { code: hit.code || null, label: hit.label ? String(hit.label).slice(0, 160) : null };
+    const fallback = nameFromChanges(changes) || earlierNames[r.entity_id];
+    return { code: null, label: LOOKUPS[type] ? `${fallback || 'Item'} (deleted)` : null };
+  };
+}
+
 async function getAuditLogs(params = {}) {
   const page = Math.max(1, params.page || 1);
   // Up to 1000 rows per page (the Export button asks for many at once)
@@ -84,7 +156,7 @@ async function getAuditLogs(params = {}) {
   );
 
   const [rows] = await pool.query(
-    `SELECT a.*, u.full_name as user_name
+    `SELECT a.*, u.full_name as user_name, u.user_code as user_code
      FROM audit_logs a
      LEFT JOIN users u ON a.user_id = u.id
      ${where}
@@ -93,17 +165,25 @@ async function getAuditLogs(params = {}) {
     [...values, pageSize, offset]
   );
 
-  const items = rows.map((row) => ({
+  const describe = await describeItems(rows);
+  const items = rows.map((row) => {
+    const changes = parseJsonColumn(row.changes);
+    const item = describe(row, changes);
+    return {
     id: row.id,
     user_id: row.user_id,
+    user_code: row.user_code || null,
     user_name: row.user_name || (row.user_id ? 'Unknown' : 'System'),
+    item_code: item.code,
+    item_label: item.label,
     entity_type: row.entity_type,
     entity_id: row.entity_id || null,
     action: row.action,
-    changes: parseJsonColumn(row.changes),
+    changes,
     ip_address: row.ip_address,
     created_at: row.created_at,
-  }));
+  };
+  });
 
   return {
     items,

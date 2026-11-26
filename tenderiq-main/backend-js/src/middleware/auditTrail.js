@@ -99,9 +99,17 @@ function auditTrail(req, res, next) {
     const path = (req.originalUrl || '').split('?')[0];
     const rule = RULES.find((r) => r.methods.has(req.method) && r.re.test(path));
     if (!rule || !rule.action) return next();
-    const entityId = (path.match(rule.re) || [])[1] || null;
+    let entityId = (path.match(rule.re) || [])[1] || null;
     // Read the body now: some routes change req.body while they work
     const body = req.body;
+    // "Create" addresses have no id in them: take the new item's id from the answer
+    if (!entityId) {
+        const json = res.json.bind(res);
+        res.json = (data) => {
+            if (data && typeof data === 'object' && !Array.isArray(data) && data.id) entityId = String(data.id);
+            return json(data);
+        };
+    }
     res.on('finish', () => {
         if (res.statusCode < 200 || res.statusCode >= 300) return;
         const extra = {};
