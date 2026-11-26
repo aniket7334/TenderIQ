@@ -40,23 +40,25 @@ const tenderService = __importStar(require("../services/tender.service"));
 const auditService = __importStar(require("../services/audit.service"));
 const errorHandler_1 = require("../middleware/errorHandler");
 const router = (0, express_1.Router)();
-// Europe tenders are shown live from TED (src/sources/ted.js) and never stored.
-const ted = require('../sources/ted');
+// Europe (TED) and UK (Find a Tender) tenders are shown live and never stored — see src/sources/
+const live = require('../sources');
+const ted = live.ted;
 const sendError = (res, err) => (err instanceof errorHandler_1.AppError
     ? res.status(err.statusCode).json({ detail: err.message })
     : res.status(500).json({ detail: 'Internal server error' }));
 // Live (TED) tenders can't be shortlisted, tagged, commented or edited — that needs storage
 router.use((req, res, next) => {
-    if (req.method !== 'GET' && req.path.startsWith('/ted-'))
-        return res.status(400).json({ detail: 'Europe tenders are shown live from TED and are not stored, so they cannot be shortlisted or edited.' });
+    if (req.method !== 'GET' && live.sourceForId(req.path.slice(1)))
+        return res.status(400).json({ detail: 'This tender is shown live from its official source and is not stored, so it cannot be shortlisted or edited.' });
     next();
 });
 // GET / - List tenders
 router.get('/', auth_1.authenticate, async (req, res) => {
     // Region "Europe" or a European country → live from TED, nothing stored
-    if (ted.isEuropeRegion(req.query.country)) {
+    const liveSource = live.sourceForRegion(req.query.country);
+    if (liveSource) {
         try {
-            return res.json(await ted.searchTenders({
+            return res.json(await liveSource.searchTenders({
                 region: req.query.country,
                 city: req.query.city,
                 category: req.query.category,
@@ -145,6 +147,11 @@ router.get('/facets', auth_1.authenticate, async (_req, res) => {
             regions: india.count ? [{ country: 'India', count: Number(india.count) }] : [],
             // Live count for "All Europe" (TED, not stored); null if TED didn't answer in time
             europe_total: await ted.countEurope(),
+            // Live count for "All UK" (Find a Tender, kept in memory, not stored)
+            uk_total: await live.fts.countUk(),
+            // World Bank (worldwide, kept in memory, not stored): total + countries with open notices
+            worldbank_total: await live.worldbank.countWorldBank(),
+            worldbank_countries: live.worldbank.countries(),
         });
     }
     catch (err) {
@@ -152,9 +159,9 @@ router.get('/facets', auth_1.authenticate, async (_req, res) => {
     }
 });
 router.get('/:tender_id', auth_1.authenticate, async (req, res) => {
-    if (ted.isLiveId(req.params.tender_id)) {
+    if (live.sourceForId(req.params.tender_id)) {
         try {
-            return res.json(await ted.getTender(req.params.tender_id));
+            return res.json(await live.sourceForId(req.params.tender_id).getTender(req.params.tender_id));
         }
         catch (err) {
             return sendError(res, err);
@@ -265,9 +272,9 @@ router.post('/:tender_id/comments', auth_1.authenticate, async (req, res) => {
 });
 // GET /:tender_id/documents - List documents
 router.get('/:tender_id/documents', auth_1.authenticate, async (req, res) => {
-    if (ted.isLiveId(req.params.tender_id)) {
+    if (live.sourceForId(req.params.tender_id)) {
         try {
-            return res.json(await ted.getDocuments(req.params.tender_id));
+            return res.json(await live.sourceForId(req.params.tender_id).getDocuments(req.params.tender_id));
         }
         catch (err) {
             return sendError(res, err);
@@ -288,7 +295,7 @@ router.get('/:tender_id/documents', auth_1.authenticate, async (req, res) => {
 });
 // GET /:tender_id/history - Get audit trail
 router.get('/:tender_id/history', auth_1.authenticate, async (req, res) => {
-    if (ted.isLiveId(req.params.tender_id)) return res.json([]);
+    if (live.sourceForId(req.params.tender_id)) return res.json([]);
     try {
         const tenderId = req.params.tender_id;
         const history = await tenderService.getTenderHistory(tenderId);

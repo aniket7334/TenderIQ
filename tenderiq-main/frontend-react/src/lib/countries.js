@@ -29,7 +29,6 @@ export const ALL_COUNTRIES = ISO_CODES.map((code) => {
 
 /** Multilateral funders that publish tenders but aren't countries. */
 export const INTERNATIONAL_REGIONS = [
-  { value: 'World Bank', label: 'World Bank', flag: '🏦' },
   { value: 'United Nations', label: 'United Nations', flag: '🇺🇳' },
 ];
 
@@ -44,3 +43,18 @@ export const EUROPE_COUNTRY_NAMES = [
   'Spain', 'Sweden', 'Switzerland',
 ];
 export const isEuropeRegion = (v) => v === EUROPE || EUROPE_COUNTRY_NAMES.includes(v);
+
+/* United Kingdom: shown live from Find a Tender (the UK government's tender
+   service) — nothing is stored. Must match backend-js/src/sources/fts.js. */
+export const UK = 'United Kingdom';
+export const UK_NATIONS = ['England', 'Scotland', 'Wales', 'Northern Ireland'];
+export const isUkRegion = (v) => v === UK || UK_NATIONS.includes(v);
+
+/* Worldwide: World Bank procurement notices, shown live (not stored).
+   'World Bank' = all countries; 'World Bank: <country>' = one country. */
+export const WORLD_BANK = 'World Bank';
+export const WORLD_BANK_PREFIX = 'World Bank: ';
+export const isWorldBankRegion = (v) => v === WORLD_BANK || String(v || '').startsWith(WORLD_BANK_PREFIX);
+
+/** Regions served live by the API (not from the database). */
+export const isLiveRegion = (v) => isEuropeRegion(v) || isUkRegion(v) || isWorldBankRegion(v);

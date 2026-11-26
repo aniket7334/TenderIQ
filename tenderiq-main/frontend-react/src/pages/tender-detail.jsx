@@ -365,7 +365,7 @@ export default function TenderDetailPage() {
     );
   }
 
-  // Live tenders (Europe, from TED) aren't stored: no notes/history/shortlist
+  // Live tenders (Europe from TED, UK from Find a Tender) aren't stored: no notes/history/shortlist
   const isLive = !!tender.is_live;
   const money = (v, cur) => {
     try {
@@ -381,19 +381,23 @@ export default function TenderDetailPage() {
   ];
   const liveFields = [
     { label: 'Name of Work', value: tender.title },
-    { label: 'TED Notice Number', value: tender.reference_number },
+    { label: 'Notice Number', value: tender.reference_number },
     { label: 'Buyer', value: tender.organization, icon: Building2 },
     { label: 'Location', value: tender.location, icon: MapPin },
     { label: 'Category', value: (tender.categories || []).join(', ') || null },
+    { label: 'Project', value: tender.project_name },
+    { label: 'Language', value: tender.original_language ? (tender.translated || tender.original_title ? `${tender.original_language} — translated to English automatically` : `${tender.original_language} (English translation not available)`) : null },
+    { label: 'Original Title', value: tender.original_title },
     { label: 'Contract Type', value: tender.tender_type },
     { label: 'Procedure', value: tender.procedure },
     { label: 'Estimated Value', value: tender.estimated_value ? money(tender.estimated_value, tender.currency) : null },
     { label: 'Published Date', value: formatDate(tender.published_date), icon: Calendar },
     { label: 'Submission Deadline', value: formatDate(tender.submission_deadline), icon: Clock },
     { label: 'CPV Codes', value: (tender.cpv_codes || []).join(', ') || null },
-    { label: 'Source', value: 'TED — Tenders Electronic Daily (EU), shown live' },
+    { label: 'Source', value: tender.source_label || `${tender.source_name} (shown live)` },
     { label: 'Source URL', value: tender.source_url },
     { label: 'Description', value: tender.description },
+    { label: 'Original Notice Text', value: tender.original_description },
   ];
 
   const storedTabs = [
@@ -446,7 +450,7 @@ export default function TenderDetailPage() {
             <span className="break-all font-mono text-sm text-gray-500">{tender.reference_number}</span>
             {isLive ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-600">
-                <Globe className="h-3 w-3" /> Live · TED (EU)
+                <Globe className="h-3 w-3" /> Live · {tender.source_name}
               </span>
             ) : (
             <span
@@ -524,7 +528,7 @@ export default function TenderDetailPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               <ExternalLink className="h-4 w-4" />
-              <span className="hidden sm:inline">{isLive ? 'View on TED' : 'Source'}</span>
+              <span className="hidden sm:inline">{isLive ? 'View notice' : 'Source'}</span>
             </a>
           )}
         </div>
@@ -611,7 +615,7 @@ export default function TenderDetailPage() {
                   <div
                     key={field.label}
                     className={
-                      field.label === 'Description' || field.label === 'Eligibility / Scope'
+                      field.label === 'Description' || field.label === 'Eligibility / Scope' || field.label === 'Original Notice Text' || field.label === 'Name of Work'
                         ? 'sm:col-span-2'
                         : ''
                     }
@@ -785,7 +789,7 @@ export default function TenderDetailPage() {
               Live tender
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              This Europe tender is shown live from TED, the EU's official tender journal. TenderIQ doesn't store it,
+              This tender is shown live from {tender.source_name}, its official public source. TenderIQ doesn't store it,
               so shortlisting, tags, owners and comments aren't available.
             </p>
             <button

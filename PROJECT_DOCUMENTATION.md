@@ -40,7 +40,7 @@ TenderIQ is a **tender intelligence web app for Indian government tenders**, bui
 It:
 
 - **Collects tenders automatically** from government portals — mainly **GeM** (Government e-Marketplace, all-India bids), plus CPPP / eTenders, IREPS and individual port trust sites.
-- **Shows Europe's tenders live** from **TED** (the EU's official tender journal) in the same Tenders tab — chosen through the Region filter, **never stored**.
+- **Shows Europe's, the UK's and World Bank (worldwide) tenders live** — from **TED** (the EU's official tender journal), **Find a Tender** (the UK government's tender service) and the **World Bank** procurement notices — in the same Tenders tab, chosen through the Region filter, **never stored in the database**. French / Spanish / Portuguese notices are matched to the English categories (and translated when an OpenAI key with credit is set).
 - **Keeps only relevant tenders**, sorting each one into the team's **31 categories** (Port, Jetty, Dredging, Pipeline, Railway, Electrical, …).
 - **Shows dredging / marine / pipeline / shipping tenders first**.
 - **Stays live** — new GeM bids appear in the app within about 5 minutes, and open pages refresh by themselves.
@@ -57,6 +57,9 @@ It:
 | GeM relay | https://tenderiq-theta.vercel.app/api/gem-proxy (key-protected) | Vercel serverless function, **Mumbai (bom1)** |
 | Database | TiDB Cloud Starter (MySQL-compatible, TLS) | TiDB Cloud (free) |
 | Europe tenders | TED search API (`api.ted.europa.eu`), read live — no key, nothing stored | EU Publications Office (free) |
+| UK tenders | Find a Tender OCDS API (`find-tender.service.gov.uk/api/1.0`), working copy in server memory — no key, nothing stored | UK Government (free) |
+| Worldwide tenders | World Bank procurement notices API (`search.worldbank.org/api/v2/procnotices`), working copy in server memory — no key, nothing stored | World Bank (free) |
+| Translation (optional) | OpenAI (`OPENAI_API_KEY`, model `gpt-4o-mini`) — English titles / notice texts, cached in memory | Needs credit on the OpenAI account |
 | Source code | https://github.com/aniket7334/TenderIQ (branch `main`) | GitHub |
 
 Pushing to `main` redeploys **both** Vercel (frontend) and Render (backend) automatically.
@@ -88,6 +91,10 @@ Pushing to `main` redeploys **both** Vercel (frontend) and Render (backend) auto
                                                bidplus.gem.gov.in (GeM)
 ```
 
+**World Bank:** when the Region filter is *World Bank* or *World Bank: <country>*, the API answers from an in-memory working copy of the currently open World Bank notices (loaded at start, refreshed every 30 minutes).
+
+**UK (Find a Tender):** when the Region filter is *United Kingdom* or England / Scotland / Wales / Northern Ireland, the API answers from an in-memory working copy of the UK's open tenders (loaded at start, refreshed every 30 minutes) — not the database.
+
 **Europe (TED):** when the Region filter is *Europe* or a European country, the API asks TED live instead of the database and maps the answer to the normal tender shape — nothing is written to the database; answers are kept in server memory for 10 minutes only.
 
 **Why the relay?** GeM **refuses connections from Render's Singapore servers** (`ECONNREFUSED`) but accepts connections from India. A small Vercel function running in **Mumbai** forwards Render's GeM requests. Locally (in India) the backend calls GeM directly.
@@ -114,7 +121,7 @@ D:\tenderiq-main\                      ← git repository root
     │       ├── services\              ← business logic (tenders, alerts, categories, priority, documents…)
     │       ├── workers\               ← scheduler + scrape / alert / extraction jobs
     │       ├── scrapers\              ← portal adapters (GeM, CPPP, eTenders, IREPS, generic), gemHttp relay client
-    │       ├── sources\ted.js         ← live Europe tenders from TED (search, detail, documents; no storage)
+    │       ├── sources\              ← live regions, never stored: index.js (registry), ted.js (Europe), fts.js (UK), worldbank.js (worldwide), translate.js (glossary + OpenAI translation)
     │       ├── extraction\            ← text extraction + LLM providers (OpenAI / Claude / Ollama)
     │       ├── tenderNotes\           ← AI tender-note generation from templates
     │       ├── notifications\         ← in-app + email senders
@@ -156,7 +163,7 @@ Base path: **`/api/v1`**. All routes except auth and `/health` need a `Authoriza
 ### Health
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/health` | Server + DB status, plus `gem_sync` (running, last run, last success, new tenders, listings read, last error) |
+| GET | `/health` | Server + DB status, plus `gem_sync` (running, last run, last success, new tenders, listings read, last error) `uk_live` (UK snapshot: ready/loading, open tenders, last sync), `worldbank_live` (open notices, non-English, translated) and `translation` (OpenAI on/paused, last error) |
 
 ### Auth — `/auth`
 `POST /register`, `POST /login`, `POST /refresh`, `GET /me`, `POST /oauth/:provider`
@@ -164,22 +171,22 @@ Base path: **`/api/v1`**. All routes except auth and `/health` need a `Authoriza
 ### Tenders — `/tenders`
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/` | List with filters (`search`, `internal_status`, `source_id`, `category`, `country`, `min_value`, `max_value`, `date_from`, `date_to`), paging (`page`, `page_size`), sort (`sort_by`, `sort_order`) and **`priority_first=1`**. **`country=Europe` or a European country → live from TED** (also `city`, `category`, `search`, `page`, `sort_by`); response adds `live_source: "TED"` |
+| GET | `/` | List with filters (`search`, `internal_status`, `source_id`, `category`, `country`, `min_value`, `max_value`, `date_from`, `date_to`), paging (`page`, `page_size`), sort (`sort_by`, `sort_order`) and **`priority_first=1`**. **`country=Europe` or a European country → live from TED; `country=United Kingdom`/England/Scotland/Wales/Northern Ireland → live from Find a Tender; `country=World Bank` or `World Bank: <country>` → live from the World Bank** (also `city`, `category`, `search`, `page`, `sort_by`); response adds `live_source` |
 | GET | `/updates?since=ISO` | New-tender count since a time + GeM sync status (polled by pages every minute) |
-| GET | `/facets` | Category and region counts for filter dropdowns, plus `europe_total` (live count of open Europe tenders from TED, not stored) |
-| GET | `/:id` | Tender detail. Ids starting `ted-` (e.g. `ted-766488-2026`) are read live from TED and include `how_to_apply` (deadline, procedure, submission/documents links, buyer contact) |
+| GET | `/facets` | Category and region counts for filter dropdowns, plus `europe_total` (TED), `uk_total` (Find a Tender), `worldbank_total` and `worldbank_countries` (countries with open World Bank notices) — live, not stored |
+| GET | `/:id` | Tender detail. Ids starting `ted-` (e.g. `ted-766488-2026`, TED), `uk-` (e.g. `uk-111450-2026`, Find a Tender) or `wb-` (e.g. `wb-OP00482140`, World Bank) are read live and include `how_to_apply` (deadline, procedure, submission/documents links, buyer contact) |
 | PATCH | `/:id` | Update (status/shortlist, assignee, fields) |
 | POST | `/:id/shortlist` | Toggle shortlist flag |
 | POST / DELETE | `/:id/tags`, `/:id/tags/:tag` | Add / remove tags |
 | POST | `/:id/comments` | Add comment |
-| GET | `/:id/documents` | Documents bundle (fetches & parses the GeM bid PDF; `?refresh=1` re-fetches). For `ted-` ids: official notice PDF, notice page, buyer's documents & submission links |
+| GET | `/:id/documents` | Documents bundle (fetches & parses the GeM bid PDF; `?refresh=1` re-fetches). For `ted-`/`uk-`/`wb-` ids: official notice (PDF for TED), notice page, buyer's documents & submission links; World Bank adds the full notice text (`notice_text`) |
 | GET | `/:id/history` | Audit trail |
 | POST | `/:id/fetch-details` | Re-fetch details from the source portal |
 
-Changes to `ted-` tenders (shortlist, tags, comments, edits) are refused with a clear message — they aren't stored.
+Changes to live (`ted-`/`uk-`/`wb-`) tenders (shortlist, tags, comments, edits) are refused with a clear message — they aren't stored.
 
 ### Sources — `/sources` (scraping portals)
-`GET /`, `GET /live` (live sources — TED — with status, open tenders, success rate, response time; `?fresh=1` asks TED again), `POST /`, `POST /scrape-all` (Scrape Now), `POST /scrape-type/:adapter` (GeM Now = `gem`), `GET|PATCH|DELETE /:id`, `POST /:id/scrape`, `GET /:id/runs`
+`GET /`, `GET /live` (live sources — TED, Find a Tender, World Bank — with status, open tenders, success rate, response time; `?fresh=1` asks again), `POST /`, `POST /scrape-all` (Scrape Now), `POST /scrape-type/:adapter` (GeM Now = `gem`), `GET|PATCH|DELETE /:id`, `POST /:id/scrape`, `GET /:id/runs`
 
 ### Alerts — `/alerts`
 `GET /` (feed), `GET /unread-count`, `GET /today` (today's new tenders, by category), `PATCH|POST /:id/read`, `POST /mark-all-read`, `POST /:id/delete`, `GET|PATCH /settings` (per-user notification settings)
@@ -188,7 +195,7 @@ Changes to `ted-` tenders (shortlist, tags, comments, edits) are refused with a 
 - `/keywords` — keyword CRUD, bulk add, test matching
 - `/templates` — tender-note templates (upload Word templates, placeholders)
 - `/tender-notes` — generate AI notes for a tender, edit, export
-- `/admin` — `GET /dashboard` (stats, upcoming deadlines, monthly trend; `europe_live_total` = live TED count added to Total tenders, `stored_tenders` = India tenders in the database), `GET /audit-logs`, user management (`/users`, roles)
+- `/admin` — `GET /dashboard` (stats, upcoming deadlines, monthly trend; `europe_live_total` / `uk_live_total` / `worldbank_live_total` = live counts added to Total tenders, `stored_tenders` = India tenders in the database), `GET /audit-logs`, user management (`/users`, roles)
 - Extra routes in `routes/index.js`: `/dashboard`, `/extract-costs`, `/tenders/:id/infographic`, `/live-tenders`, `/live-tenders/import`
 
 ### Scheduler (`src/workers/scheduler.js`)
@@ -270,6 +277,36 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 
 **Limits:** TED rate-limits busy clients (HTTP 429) — answers are cached in memory for 10 minutes and retried briefly. Europe tenders can't be shortlisted, tagged, commented or counted on the Dashboard (that needs storage). The UK is not on TED since Brexit (planned next: Find a Tender).
 
+### United Kingdom — live from Find a Tender (not stored)
+
+**Source:** Find a Tender (find-tender.service.gov.uk), the UK government's official service for public tenders (UK tenders left TED after Brexit). Free OCDS API, **no key**: `GET https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages?stages=tender&updatedFrom=…&limit=100` (cursor paging via `links.next`). Code: `backend-js/src/sources/fts.js`.
+
+**Why a memory copy:** the API can't filter by category, region or keyword — only "updated since". So the server keeps the UK's open tender notices **in memory** (≈200, a few MB): full load of the last 180 days at start (~1 minute, one page per ~1 s because the API rate-limits with HTTP 429), then only changes every 30 minutes; closed/cancelled notices are dropped. Nothing goes to the database; the copy is rebuilt after a restart (`/health` → `uk_live` shows it).
+
+**Filtering:** region from the official UK region code on the notice (UKM Scotland, UKL Wales, UKN Northern Ireland, UKC–UKK England); city = buyer's town; sectors use the **same CPV mapping as TED** (CPV codes first, category words only on the title and the start of the description — long descriptions list every eligible public body). No sector → the dredging / marine / pipeline / shipping group. Search box matches title, description and buyer.
+
+**Detail & how to apply:** buyer, contact person, email, phone, address, website; value (GBP), deadline, procedure; submission portal (e.g. Public Contracts Scotland); notice page `find-tender.service.gov.uk/Notice/<id>`. Ids look like `uk-111450-2026`.
+
+**Example:** "Provision of dry docking facilities for refit/maintenance of marine vessels" — Shetland Islands Council, Lerwick, £6,000,000, deadline 11 Jan 2027.
+
+### Worldwide — live from the World Bank (not stored)
+
+**Source:** World Bank procurement notices for World Bank–financed projects in 100+ countries. Free API, **no key**: `GET https://search.worldbank.org/api/v2/procnotices?format=json&notice_type=…&srt=noticedate&order=desc&rows=500&os=…&fl=…`; one notice: `?id=OP00482140` (includes the full `notice_text` and contact fields). Code: `backend-js/src/sources/worldbank.js`.
+
+**Memory copy:** most of the ~428,000 notices are old awards, so the server loads only **open** notices — Invitation for Bids, Request for Expression of Interest, Invitation for Prequalification — with a future deadline (~600 across ~100 countries, ~12 requests). Reloaded every 30 minutes; nothing in the database (`/health` → `worldbank_live`).
+
+**Languages:** ~37% of open notices are French, Portuguese or Spanish. `sources/translate.js`:
+1. **Glossary (always on, free):** French/Spanish/Portuguese procurement words → English keywords before category matching (dragage → dredging, quai → quay/berth, jetée/muelle → jetty, oléoduc/conduites/tuberías → pipeline, routes/carreteras → road, eau potable → water supply, …). Port-named places (Porto Alegre, Port Moresby, Port-au-Prince, …) are removed first.
+2. **Full English (optional):** with `OPENAI_API_KEY` set **and credit on the account**, titles are translated in batches and notice texts on demand (`gpt-4o-mini`, `TRANSLATE_MODEL` to change), cached in memory. If OpenAI answers "no credits", translation pauses for an hour and original-language titles are shown with a "French notice" label; matching still works through the glossary.
+
+**Categories** come from each notice's own title (never the project name — that tagged every notice of a waterways project as "Waterway"). No sector → the dredging / marine / pipeline / shipping group (priority phrases + priority categories).
+
+**Region values:** `World Bank` (all countries) and `World Bank: <country>` for the 100+ countries with open notices (list comes from `/tenders/facets`). City filter matches the contact address. World Bank also funds projects in India — those are separate World Bank notices, not GeM duplicates.
+
+**Detail & how to apply:** procurement method, works/goods/consulting, project, bid reference, full notice text (HTML entities decoded), contact person, organisation, email, phone, address, website/portal found in the text; notice page `projects.worldbank.org/en/projects-operations/procurement-detail/<id>`.
+
+**Examples:** Majunga port rehabilitation (quays), Madagascar; maritime tug with azimuth thrusters; coastal erosion control (The Gambia); new water intake on the Congo River incl. delivery pipelines (DR Congo).
+
 ---
 
 ## 9. Categories and priority tenders
@@ -302,14 +339,14 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 | Page | What it does |
 |---|---|
 | **Sign in / Create account** | Premium two-panel sign-in & registration. Demo quick-login buttons appear **only in local development** (compiled out of production builds). |
-| **Dashboard** | Classic cards: Total tenders (India stored + Europe live from TED, with the breakdown; + added today), Shortlisted, Pending review, Closing soon. Upcoming deadlines (priority first, "Today / N days left"), Tenders per month chart, **5 recent tenders** (priority first). Buttons: Refresh, **GeM Now** (fetch newest GeM bids), **Scrape Now** (all sources). Live label + auto refresh. |
-| **Tenders** | Full list with advanced filters (region — all countries, sector/category, value range, dates, status, source), density options, columns, CSV export, sorting, paging; **star to shortlist / unshortlist**; priority tenders first; live auto refresh. **Region → "Europe — live from TED"** (All Europe or one of 31 countries) shows Europe's open tenders live, with a **City** filter and a "Live from TED" note; rows show city, country, "Live" and "TED (EU)". |
-| **Tender detail** | Overview, **Documents**, Notes, History tabs; shortlist, download, fetch from source, infographic, tags, assignee, comments. **Europe (TED) tenders:** Overview, Documents (notice PDF + buyer's documents/submission links) and **How to apply** (deadline, Submit online, steps, buyer contact); shortlist/notes/history hidden because nothing is stored. |
+| **Dashboard** | Classic cards: Total tenders (India stored + Europe, UK and World Bank live, with the breakdown "India · Europe · UK · World Bank (live)"; + added today), Shortlisted, Pending review, Closing soon. Upcoming deadlines (priority first, "Today / N days left"), Tenders per month chart, **5 recent tenders** (priority first). Buttons: Refresh, **GeM Now** (fetch newest GeM bids), **Scrape Now** (all sources). Live label + auto refresh. |
+| **Tenders** | Full list with advanced filters (region — all countries, sector/category, value range, dates, status, source), density options, columns, CSV export, sorting, paging; **star to shortlist / unshortlist**; priority tenders first; live auto refresh. **Region → "Europe — live from TED"** (All Europe or one of 31 countries) **"United Kingdom — live from Find a Tender"** (All UK, England, Scotland, Wales, Northern Ireland) and **"Worldwide — live from the World Bank"** (All World Bank countries + ~100 countries) show open tenders live, with a **City** filter and a "Live from …" note; rows show city, country/nation, "Live", the source and the notice language ("French notice" / "Translated from French"). |
+| **Tender detail** | Overview, **Documents**, Notes, History tabs; shortlist, download, fetch from source, infographic, tags, assignee, comments. **Live tenders (TED, Find a Tender, World Bank):** Overview (plus Project, Language, Original title/text for World Bank), Documents (official notice + buyer's documents/submission links) and **How to apply** (deadline, Submit online, steps, buyer contact); shortlist/notes/history hidden because nothing is stored. |
 | **Shortlisted** | All shortlisted tenders with value and days left; sort (closing soonest / newest / highest value); remove from shortlist; paging. |
 | **Tender Notes** | AI-generated tender notes from templates; edit and export. |
 | **Alerts** | Today's new tenders (matching my alerts / all, by category), alert feed (All / Unread / New tenders / Closing soon), mark read, delete, mark all read; link to notification settings. |
 | **Settings** | Account details; **notification settings** (new tender alerts, closing-soon alerts with 1/3/7-day reminder, keywords-only, categories, browser notifications). |
-| **Admin** | Sources — one table: GeM, port trusts (eTenders), CPPP, IREPS (edit, activate, scrape, history, delete) **and TED** (adapter TED, `https://ted.europa.eu`, Active/Busy, last checked, success rate, "Europe · live, not stored · N open"; actions: **Check now** and **Open Europe tenders**). Success rate is shown as the API's percentage. Keywords, Templates, Users (roles), Audit log. |
+| **Admin** | Sources — one table: GeM, port trusts (eTenders), CPPP, IREPS (edit, activate, scrape, history, delete) **plus the live sources TED, Find a Tender and World Bank** (adapter TED/FTS/WORLDBANK, website, Active/Busy/Loading, last checked, success rate, "Europe/United Kingdom · live, not stored · N open"; actions: **Check now** and **Open tenders**). Success rate is shown as the API's percentage. Keywords, Templates, Users (roles), Audit log. |
 
 ---
 
@@ -360,6 +397,7 @@ Values are never committed. Templates with names only: `backend-js/.env.example`
 | `GEM_SYNC_MINUTES` | Minutes between GeM syncs (default 5) |
 | `KEEP_AWAKE` | Render only; `false` lets the free server sleep (stops live sync) |
 | `GEM_PROXY_URL`, `GEM_PROXY_KEY` | **Render only** — GeM relay address and shared key. Leave empty locally. |
+| `TRANSLATE_MODEL` | Optional OpenAI model for translating World Bank notices (default `gpt-4o-mini`; uses `OPENAI_API_KEY`) |
 
 `RENDER_EXTERNAL_URL` is set by Render automatically (used for keep-awake).
 
@@ -456,6 +494,8 @@ Password rule (scripts and sign-up): at least 8 characters with a letter and a n
 | Local API keeps restarting | `npm run dev` restarts on file changes (normal while editing). |
 
 | Europe list says "TED is busy" | TED rate limit — wait a minute; repeat views come from the 10-minute cache. |
+| UK list says "UK tenders are loading" | First load after a server start (~1 minute) — try again; `/health` → `uk_live.status` shows `ready` when done. |
+| World Bank titles stay in French/Spanish | OpenAI translation is off or paused — `/health` → `translation.paused_reason` (e.g. no credits). Add credit to the OpenAI account or set `OPENAI_API_KEY`; matching works without it. |
 | Europe list fails on the live site only | Render may not reach TED — add `api.ted.europa.eu` to the relay's allowed hosts and route TED calls through it. |
 
 Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api/gem-check` (can Mumbai reach GeM?).
@@ -491,6 +531,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 25. **Europe tenders, live from TED** — Region filter gets "Europe — live from TED" (All Europe + 31 countries) and a City filter; the Tenders tab and tender page show TED tenders live with Documents and **How to apply**, **nothing stored**; categories mapped to CPV codes; opens on the marine/dredging/pipeline group.
 26. **Europe totals without storage** — Dashboard Total tenders includes the live Europe count ("India · Europe (live)"); Region shows All Europe (N) and Sector shows the live total for the Europe view / chosen sector.
 27. **TED in the Sources tab** — TED listed as a row in Admin → Sources next to GeM (Active, last checked, success rate, open tenders; Check now / Open Europe tenders). Fixed the Success Rate column showing 5000% (it multiplied a percentage by 100).
+28. **United Kingdom, live from Find a Tender** — Region group "United Kingdom — live from Find a Tender" (All UK + 4 nations), City filter, tender page with Documents and How to apply, UK in Dashboard total, Find a Tender row in Sources; UK tenders kept in server memory (refreshed every 30 min), never in the database; live sources now go through `src/sources/index.js`.
+29. **Worldwide, live from the World Bank** — Region group "Worldwide — live from the World Bank" (all + ~100 countries), ~600 open notices kept in memory (30-min refresh), French/Spanish/Portuguese matched through a built-in glossary and translated with OpenAI when credit is available (paused automatically otherwise), Overview/Documents (full notice text)/How to apply (contact person, email, phone), World Bank in Dashboard total and Sources.
 
 ---
 
@@ -499,9 +541,10 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 **Worldwide tender sources** — region by region, shown **live (not stored)** in the Tenders tab via the Region filter:
 
 1. ~~**TED** (Europe)~~ — **done** (live, see §8)
-2. **World Bank** procurement notices (free API, developing countries worldwide)
-3. **SAM.gov** (USA, free API key needed; NAICS/PSC codes)
-4. **UK** Find a Tender / Contracts Finder, then **UNGM** (UN agencies)
+2. ~~**UK** Find a Tender~~ — **done** (live, see §8)
+3. ~~**World Bank**~~ — **done** (live, see §8)
+4. **SAM.gov** (USA, free API key needed; NAICS/PSC codes)
+5. **UNGM** (UN agencies), ADB/AfDB, Open Contracting Data Registry; UK Contracts Finder (smaller English tenders — its search filters didn't work when tested)
 
 Considerations: live sources depend on each API's speed and rate limits (short memory cache), English titles for matching, and some portals may block foreign servers (the relay approach may be needed again).
 

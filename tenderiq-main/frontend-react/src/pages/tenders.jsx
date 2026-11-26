@@ -21,7 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
-import { ALL_COUNTRIES, INTERNATIONAL_REGIONS, EUROPE, EUROPE_COUNTRY_NAMES, isEuropeRegion } from '@/lib/countries';
+import { ALL_COUNTRIES, INTERNATIONAL_REGIONS, EUROPE, EUROPE_COUNTRY_NAMES, UK, UK_NATIONS, isUkRegion, isLiveRegion, WORLD_BANK, isWorldBankRegion } from '@/lib/countries';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useLiveTenders } from '@/hooks/useLiveTenders';
@@ -170,13 +170,18 @@ function TendersPageContent() {
   const [regionFacets, setRegionFacets] = useState([]);
   // Live count of open Europe tenders (TED) — counted, not stored
   const [europeTotal, setEuropeTotal] = useState(null);
+  const [ukTotal, setUkTotal] = useState(null);
+  const [wbTotal, setWbTotal] = useState(null);
+  const [wbCountries, setWbCountries] = useState([]);
   const [sectorFacets, setSectorFacets] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
 
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedCountry, setSelectedCountry] = useState(searchParams.get('country') || '');
-  // Europe regions are loaded live from TED (not stored); they can also filter by city
-  const europeMode = isEuropeRegion(selectedCountry);
+  // Europe (TED) and UK (Find a Tender) regions are loaded live (not stored); they can also filter by city
+  const europeMode = isLiveRegion(selectedCountry);
+  const ukMode = isUkRegion(selectedCountry);
+  const wbMode = isWorldBankRegion(selectedCountry);
   const [selectedCity, setSelectedCity] = useState(searchParams.get('city') || '');
   const [cityInput, setCityInput] = useState(searchParams.get('city') || '');
   const [liveInfo, setLiveInfo] = useState(null);
@@ -252,6 +257,9 @@ function TendersPageContent() {
       const res = await api.get('/tenders/facets');
       setRegionFacets(res.data.regions || []);
       setEuropeTotal(res.data.europe_total ?? null);
+      setUkTotal(res.data.uk_total ?? null);
+      setWbTotal(res.data.worldbank_total ?? null);
+      setWbCountries(res.data.worldbank_countries || []);
       setSectorFacets(res.data.sectors || []);
     } catch {
       // non-critical — dropdowns fall back to hardcoded lists
@@ -557,6 +565,26 @@ function TendersPageContent() {
                   );
                 })}
               </optgroup>
+              <optgroup label="United Kingdom — live from Find a Tender">
+                <option value={UK}>
+                  🇬🇧 All UK{ukTotal != null ? ` (${ukTotal.toLocaleString()})` : ''}
+                </option>
+                {UK_NATIONS.map((name) => (
+                  <option key={`uk-${name}`} value={name}>
+                    🇬🇧 {name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Worldwide — live from the World Bank">
+                <option value={WORLD_BANK}>
+                  🏦 All World Bank countries{wbTotal != null ? ` (${wbTotal.toLocaleString()})` : ''}
+                </option>
+                {wbCountries.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    🏦 {c.label} ({c.open} open)
+                  </option>
+                ))}
+              </optgroup>
               <optgroup label="International">
                 {INTERNATIONAL_REGIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -565,7 +593,7 @@ function TendersPageContent() {
                 ))}
               </optgroup>
               <optgroup label="All countries">
-                {ALL_COUNTRIES.filter((c) => !regionFacets.some((r) => r.country === c.value) && !EUROPE_COUNTRY_NAMES.includes(c.value)).map((opt) => (
+                {ALL_COUNTRIES.filter((c) => !regionFacets.some((r) => r.country === c.value) && !EUROPE_COUNTRY_NAMES.includes(c.value) && c.value !== UK).map((opt) => (
                   <option key={opt.code} value={opt.value}>
                     {opt.flag} {opt.label}
                   </option>
@@ -614,7 +642,7 @@ function TendersPageContent() {
               City
             </label>
             <Input
-              placeholder="e.g. Rotterdam, Hamburg"
+              placeholder={ukMode ? 'e.g. Aberdeen, Lerwick' : wbMode ? 'e.g. Maputo, Dhaka' : 'e.g. Rotterdam, Hamburg'}
               value={cityInput}
               onChange={(e) => setCityInput(e.target.value)}
               onKeyDown={(e) => {
@@ -683,8 +711,23 @@ function TendersPageContent() {
         <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
           <Globe className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
           <p>
-            <span className="font-medium text-gray-900">Live from TED</span>, the EU's official tender journal — open
-            calls for tender only, nothing is stored.{' '}
+            {wbMode ? (
+              <>
+                <span className="font-medium text-gray-900">Live from the World Bank</span> — open notices for World Bank–financed
+                projects, nothing is stored. Notices in French, Spanish or Portuguese are matched to your categories in English
+                (titles translated when available).{' '}
+              </>
+            ) : ukMode ? (
+              <>
+                <span className="font-medium text-gray-900">Live from Find a Tender</span>, the UK government's official tender
+                service — open tenders only, nothing is stored.{' '}
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-gray-900">Live from TED</span>, the EU's official tender journal — open
+                calls for tender only, nothing is stored.{' '}
+              </>
+            )}
             {(!selectedCategory) && 'Showing dredging, marine, pipeline & shipping tenders — pick a Sector to see others. '}
             Open a tender for its documents and how to apply.
           </p>
@@ -973,6 +1016,11 @@ function TendersPageContent() {
                                 {tender.reference_number}
                               </p>
                             )}
+                            {tender.original_language && (
+                              <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                                {tender.original_title ? `Translated from ${tender.original_language}` : `${tender.original_language} notice`}
+                              </p>
+                            )}
                           </Link>
                         </td>
                         <td className={`px-4 ${rowPad}`}>
@@ -1100,6 +1148,11 @@ function TendersPageContent() {
                     )}
                     {tender.is_live && tender.location && (
                       <p className="mt-0.5 truncate text-xs text-gray-500">{tender.location}</p>
+                    )}
+                    {tender.original_language && (
+                      <p className="mt-0.5 text-[11px] text-gray-500">
+                        {tender.original_title ? `Translated from ${tender.original_language}` : `${tender.original_language} notice`}
+                      </p>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                       {tender.estimated_value && (

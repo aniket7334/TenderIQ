@@ -194,15 +194,17 @@ export default function SourcesPage() {
     }
   };
 
-  // Ask TED again now (one small request) and update its row
-  const handleCheckLive = async () => {
+  // Ask the live sources again now and update their rows
+  const handleCheckLive = async (row) => {
     try {
       setCheckingLive(true);
       const res = await api.get('/sources/live', { params: { fresh: 1 }, timeout: 60000 });
       const items = res.data.items || [];
       setLiveSources(items);
-      const ted = items[0];
-      setToast(ted?.status === 'online' ? `TED is online — ${(ted.open_tenders ?? 0).toLocaleString()} open tenders` : 'TED did not answer — try again shortly');
+      const s = items.find((x) => `live-${x.id}` === row?.id) || items[0];
+      setToast(s?.status === 'online'
+        ? `${s.short_name} is online — ${(s.open_tenders ?? 0).toLocaleString()} open tenders`
+        : `${s?.short_name || 'The source'} is ${s?.status === 'loading' ? 'still loading' : 'not answering'} — try again shortly`);
     } catch {
       // handled by interceptor
     } finally {
@@ -210,15 +212,17 @@ export default function SourcesPage() {
     }
   };
 
-  // TED shown as a normal row: name, adapter, URL, status, last checked, success rate
+  // Live sources (TED, Find a Tender) shown as normal rows: name, adapter, URL, status, last checked, success rate
   const rows = [
     ...sources,
     ...liveSources.map((s) => ({
       id: `live-${s.id}`,
       live: true,
-      name: 'TED',
-      adapter_type: 'ted',
-      base_url: 'https://ted.europa.eu',
+      name: s.short_name,
+      adapter_type: s.adapter,
+      base_url: s.website,
+      region_label: s.region_label,
+      open_path: s.open_path,
       is_active: true,
       status: s.status,
       last_scraped_at: s.last_ok_at,
@@ -230,7 +234,7 @@ export default function SourcesPage() {
   const getStatusBadge = (source) => {
     if (source.live) {
       if (source.status === 'online') return <Badge variant="success">Active</Badge>;
-      return <Badge variant="default">{source.status === 'busy' ? 'Busy' : 'Unreachable'}</Badge>;
+      return <Badge variant="default">{source.status === 'busy' ? 'Busy' : source.status === 'loading' ? 'Loading' : 'Unreachable'}</Badge>;
     }
     if (!source.is_active) return <Badge variant="default">Inactive</Badge>;
     if (source.status === 'error') return <Badge variant="danger">Error</Badge>;
@@ -316,7 +320,7 @@ export default function SourcesPage() {
                         <span className="line-clamp-2 sm:line-clamp-none">{source.name}</span>
                         {source.live && (
                           <span className="block text-xs font-normal text-gray-500">
-                            Europe · live, not stored{source.open_tenders != null ? ` · ${source.open_tenders.toLocaleString()} open` : ''}
+                            {source.region_label} · live, not stored{source.open_tenders != null ? ` · ${source.open_tenders.toLocaleString()} open` : ''}
                           </span>
                         )}
                       </td>
@@ -337,16 +341,16 @@ export default function SourcesPage() {
                         {source.live ? (
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={handleCheckLive}
+                            onClick={() => handleCheckLive(source)}
                             disabled={checkingLive}
-                            title="Check TED now"
+                            title={`Check ${source.name} now`}
                             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
                           >
                             {checkingLive ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                           </button>
                           <button
-                            onClick={() => navigate('/tenders?country=Europe')}
-                            title="Open Europe tenders"
+                            onClick={() => navigate(source.open_path)}
+                            title={`Open ${source.region_label} tenders`}
                             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                           >
                             <ArrowRight className="h-4 w-4" />

@@ -17,6 +17,11 @@ function startScheduler() {
     // column if needed and compute flags right away (Render doesn't run migrate.js)
     require('../services/priority.service').initPriority();
 
+    // UK tenders (Find a Tender): load the in-memory working copy and keep it fresh
+    require('../sources/fts').warmUp();
+    // World Bank notices (worldwide): in-memory working copy, translated titles
+    require('../sources/worldbank').warmUp();
+
     // Scrape all active sources every 1 hour to check for new tenders
     cron.schedule('0 * * * *', async () => {
         console.log('[Scheduler] Running hourly scrape for new tenders...');

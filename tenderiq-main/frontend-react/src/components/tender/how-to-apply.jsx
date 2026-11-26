@@ -2,8 +2,8 @@ import React from 'react';
 import { CalendarClock, ExternalLink, FileText, Globe, Mail, MapPin, Phone, Send, UserRound } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
-/* "How to apply" for live tenders (TED). Everything comes from the official
-   notice; TenderIQ doesn't store it. */
+/* "How to apply" for live tenders (TED, Find a Tender). Everything comes from
+   the official notice; TenderIQ doesn't store it. */
 
 function LinkButton({ href, icon: Icon, children, primary }) {
   if (!href) return null;
@@ -51,7 +51,9 @@ export default function HowToApply({ tender }) {
   const steps = [
     {
       title: 'Read the official notice',
-      text: 'Check the scope, lots, eligibility and selection criteria in the TED notice (English PDF).',
+      text: a.notice_pdf_url
+        ? 'Check the scope, lots, eligibility and selection criteria in the official notice (English PDF).'
+        : 'Check the scope, lots, eligibility and selection criteria in the official notice.',
     },
     {
       title: 'Get the tender documents',
@@ -97,6 +99,11 @@ export default function HowToApply({ tender }) {
           <LinkButton href={a.notice_pdf_url} icon={FileText}>
             Official notice (PDF, English)
           </LinkButton>
+          {!a.notice_pdf_url && (
+            <LinkButton href={a.notice_url} icon={FileText}>
+              {a.notice_label || 'Official notice'}
+            </LinkButton>
+          )}
         </div>
       </section>
 
@@ -128,6 +135,7 @@ export default function HowToApply({ tender }) {
           </header>
           <div className="space-y-4 p-5">
             <Contact icon={UserRound} label="Organisation">{b.name}</Contact>
+            <Contact icon={UserRound} label="Contact person">{b.contact_name}</Contact>
             <Contact icon={Mail} label="Email">
               {b.email && (
                 <a href={`mailto:${b.email}`} className="text-brand-700 hover:underline">
@@ -149,11 +157,12 @@ export default function HowToApply({ tender }) {
       </div>
 
       <p className="text-xs text-gray-500">
+        {a.submission_note && <span className="mb-1 block">How to submit: {a.submission_note}</span>}
         {a.language_note} Source:{' '}
         <a href={a.notice_url} target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">
-          TED notice
+          {tender.source_name} notice
         </a>
-        . Shown live — TenderIQ doesn't store Europe tenders.
+        . Shown live — TenderIQ doesn't store it.
       </p>
     </div>
   );

@@ -227,6 +227,18 @@ export default function DocumentsPanel({ bundle, loading, refreshing, onRefresh 
         </div>
       )}
 
+      {/* Full notice text (World Bank: the notice itself explains how to get the bidding documents) */}
+      {source.live && bundle?.notice_text && (
+        <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <header className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5">
+            <ScrollText className="h-[18px] w-[18px] text-gray-500" />
+            <h3 className="text-sm font-semibold text-gray-900">Notice text</h3>
+            {bundle.notice_text_original && <span className="ml-auto text-xs text-gray-500">Translated to English</span>}
+          </header>
+          <p className="max-h-[28rem] overflow-auto whitespace-pre-wrap px-5 py-4 text-sm leading-relaxed text-gray-800">{bundle.notice_text}</p>
+        </section>
+      )}
+
       {/* Files */}
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <header className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5">

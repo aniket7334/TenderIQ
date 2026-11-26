@@ -95,8 +95,7 @@ router.post('/scrape-all', auth_1.authenticate, (0, auth_1.requireRole)('admin')
 // ?fresh=1 asks TED again instead of using the 10-minute cache. Defined before /:source_id.
 router.get('/live', auth_1.authenticate, async (req, res) => {
     try {
-        const ted = require('../sources/ted');
-        res.json({ items: [await ted.sourceInfo({ fresh: req.query.fresh === '1' })] });
+        res.json({ items: await require('../sources').sourceInfos({ fresh: req.query.fresh === '1' }) });
     }
     catch (err) {
         res.status(500).json({ detail: 'Could not check live sources' });

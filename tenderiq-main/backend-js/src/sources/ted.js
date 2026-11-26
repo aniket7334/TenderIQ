@@ -394,6 +394,10 @@ async function sourceInfo({ fresh = false } = {}) {
     const ok = open_tenders != null;
     return {
         id: 'ted',
+        short_name: 'TED',
+        adapter: 'ted',
+        open_path: '/tenders?country=Europe',
+        region_label: 'Europe',
         name: 'TED — Tenders Electronic Daily (EU)',
         type: 'live',
         base_url: 'https://api.ted.europa.eu/v3/notices/search',
@@ -432,4 +436,6 @@ module.exports = {
     searchTenders, getTender, getDocuments, countEurope, sourceInfo,
     // for tests
     categoriesFromCpv, categoryClause, tedDate,
+    // shared with the UK source (same CPV system)
+    CATEGORY_CPV, PRIORITY_GROUP,
 };

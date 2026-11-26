@@ -49,6 +49,10 @@ app.get('/health', async (_req, res) => {
             timestamp: new Date().toISOString(),
             database: 'connected',
             gem_sync: await require('./src/workers/scrapeTasks').getGemSyncStatus().catch(() => null),
+            // UK tenders (Find a Tender) kept in memory, not stored
+            uk_live: await require('./src/sources/fts').health().catch(() => null),
+            worldbank_live: await require('./src/sources/worldbank').status().catch(() => null),
+            translation: require('./src/sources/translate').translationStats(),
         });
     }
     catch {
