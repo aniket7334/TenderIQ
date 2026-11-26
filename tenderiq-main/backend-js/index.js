@@ -10,8 +10,14 @@ const routes_1 = __importDefault(require("./src/routes"));
 const errorHandler_1 = require("./src/middleware/errorHandler");
 const scheduler_1 = require("./src/workers/scheduler");
 const { pool } = require('./src/db');
+const security = require('./src/middleware/security');
 
 const app = (0, express_1.default)();
+// Don't advertise the framework; Render sits in front, so trust its proxy for the real client IP
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+// Protective headers on every response
+app.use(security.securityHeaders);
 
 // ─── CORS ───────────────────────────────────────────────
 app.use((0, cors_1.default)({
@@ -24,6 +30,18 @@ app.use((0, cors_1.default)({
 // ─── Body Parsers ───────────────────────────────────────
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true }));
+// Malformed JSON → clean 400 (not a 500)
+app.use((err, _req, res, next) => {
+    if (err && (err.type === 'entity.parse.failed' || err instanceof SyntaxError)) return res.status(400).json({ detail: 'The request body is not valid JSON.' });
+    if (err && err.type === 'entity.too.large') return res.status(413).json({ detail: 'The request is too large.' });
+    next(err);
+});
+
+// ─── Rate limits ────────────────────────────────────────
+// Sign-in / sign-up: 30 attempts per 15 minutes per IP (plus a lockout per email, see auth routes)
+app.use(['/api/v1/auth/login', '/api/v1/auth/register'], security.rateLimit({ windowMs: 15 * 60 * 1000, max: 30, keyPrefix: 'auth', message: 'Too many sign-in attempts from this network. Please wait 15 minutes and try again.' }));
+// Everything else: 600 requests per minute per IP (normal use stays far below)
+app.use('/api/v1', security.rateLimit({ windowMs: 60 * 1000, max: 600, keyPrefix: 'api' }));
 
 // ─── Method Override (for hosts that block DELETE/PATCH) ─
 app.use((req, _res, next) => {
@@ -39,35 +57,36 @@ app.use('/uploads', express_1.default.static('uploads'));
 
 // ─── Health Check ───────────────────────────────────────
 app.get('/health', async (_req, res) => {
+    // Public: only whether things work. Details (counts, timings, error texts) are
+    // admin-only at /api/v1/admin/system-health.
     try {
-        const [rows] = await pool.execute('SELECT 1');
+        await pool.execute('SELECT 1');
+        const state = (x, okWord) => (x == null ? 'unknown' : x);
+        const gem = await require('./src/workers/scrapeTasks').getGemSyncStatus().catch(() => null);
+        const uk = await require('./src/sources/fts').health().catch(() => null);
+        const ted = await require('./src/sources/ted').tedHealth().catch(() => null);
+        const wb = await require('./src/sources/worldbank').status().catch(() => null);
         res.json({
             status: 'healthy',
-            service: 'TenderIQ API',
-            version: '1.0.0',
-            uptime: process.uptime(),
-            timestamp: new Date().toISOString(),
             database: 'connected',
-            gem_sync: await require('./src/workers/scrapeTasks').getGemSyncStatus().catch(() => null),
-            // UK tenders (Find a Tender) kept in memory, not stored
-            uk_live: await require('./src/sources/fts').health().catch(() => null),
-            // Europe (TED): live count (cached 10 min) + last TED error, so reachability can be checked without signing in
-            ted_live: await require('./src/sources/ted').tedHealth().catch(() => null),
-            worldbank_live: await require('./src/sources/worldbank').status().catch(() => null),
-            translation: require('./src/sources/translate').translationStats(),
+            sources: {
+                gem: gem ? (gem.last_error ? 'error' : gem.running ? 'syncing' : 'ok') : 'unknown',
+                ted: state(ted && (ted.status === 'ok' ? 'ok' : 'error')),
+                uk: state(uk && (uk.status === 'ready' ? 'ok' : uk.status === 'loading' ? 'loading' : 'error')),
+                worldbank: state(wb && (wb.status === 'ready' ? 'ok' : wb.status === 'loading' ? 'loading' : 'error')),
+            },
         });
     }
     catch {
-        res.status(503).json({
-            status: 'unhealthy',
-            service: 'TenderIQ API',
-            database: 'disconnected',
-        });
+        res.status(503).json({ status: 'unhealthy', database: 'disconnected' });
     }
 });
 
 // ─── API Routes ─────────────────────────────────────────
 app.use('/api/v1', routes_1.default);
+
+// ─── Not found (JSON, not the framework's HTML page) ────
+app.use((_req, res) => res.status(404).json({ detail: 'Not found' }));
 
 // ─── Error Handler ──────────────────────────────────────
 app.use(errorHandler_1.errorHandler);

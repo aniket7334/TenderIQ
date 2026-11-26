@@ -151,6 +151,28 @@ router.get('/dashboard', async (_req, res) => {
 });
 
 // GET /audit-logs
+// GET /system-health - Full sync / source details (admin only; the public /health shows status only)
+router.get('/system-health', async (_req, res) => {
+    try {
+        const { pool } = require('../db');
+        await pool.execute('SELECT 1');
+        res.json({
+            status: 'healthy',
+            uptime: process.uptime(),
+            timestamp: new Date().toISOString(),
+            database: 'connected',
+            gem_sync: await require('../workers/scrapeTasks').getGemSyncStatus().catch(() => null),
+            uk_live: await require('../sources/fts').health().catch(() => null),
+            ted_live: await require('../sources/ted').tedHealth().catch(() => null),
+            worldbank_live: await require('../sources/worldbank').status().catch(() => null),
+            translation: require('../sources/translate').translationStats(),
+        });
+    }
+    catch (err) {
+        console.error('[System health] failed:', err);
+        res.status(503).json({ status: 'unhealthy', database: 'disconnected' });
+    }
+});
 router.get('/audit-logs', async (req, res) => {
     try {
         const params = {};
@@ -197,6 +219,8 @@ router.post('/users', async (req, res) => {
         if (!full_name || !email || !password) {
             throw new errorHandler_1.AppError('full_name, email, and password are required', 422);
         }
+        const weakNew = require('../middleware/security').passwordProblem(password);
+        if (weakNew) throw new errorHandler_1.AppError(weakNew, 422);
         const validRoles = ['viewer', 'analyst', 'manager', 'admin'];
         if (role && !validRoles.includes(role)) {
             throw new errorHandler_1.AppError(`Invalid role. Must be one of: ${validRoles.join(', ')}`, 400);
@@ -252,6 +276,8 @@ router.patch('/users/:user_id', async (req, res) => {
         if (role !== undefined) { sets.push('role = ?'); vals.push(role); }
         if (is_active !== undefined) { sets.push('is_active = ?'); vals.push(is_active ? 1 : 0); }
         if (password) {
+            const weakEdit = require('../middleware/security').passwordProblem(password);
+            if (weakEdit) throw new errorHandler_1.AppError(weakEdit, 422);
             const bcrypt = require('bcryptjs');
             const hashedPassword = await bcrypt.hash(password, 10);
             sets.push('password_hash = ?'); vals.push(hashedPassword);

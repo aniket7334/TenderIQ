@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import useAuth, { canEditTenders } from '@/hooks/useAuth';
 
 /* Shortlisted tenders: everything starred on the Tenders list or the tender
    page (status "interested"). Classic style — navy/grey, no status colours. */
@@ -44,6 +45,7 @@ export default function ShortlistedPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [removing, setRemoving] = useState(null);
+  const canEdit = canEditTenders(useAuth((s) => s.user));
 
   const load = useCallback(async () => {
     try {
@@ -168,7 +170,7 @@ export default function ShortlistedPage() {
                       </p>
                     )}
                   </div>
-                  <button
+                  {canEdit && <button
                     type="button"
                     onClick={() => removeFromShortlist(t)}
                     disabled={removing === t.id}
@@ -177,7 +179,7 @@ export default function ShortlistedPage() {
                     className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-gray-300 hover:bg-white hover:text-gray-900 disabled:opacity-50"
                   >
                     {removing === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <StarOff className="h-4 w-4" />}
-                  </button>
+                  </button>}
                 </li>
               );
             })}

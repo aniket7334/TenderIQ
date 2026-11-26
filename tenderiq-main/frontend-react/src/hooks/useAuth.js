@@ -127,3 +127,6 @@ const useAuth = create((set) => ({
 }));
 
 export default useAuth;
+
+/** Can this user change tenders (shortlist, tags, comments, notes)? Viewers are read-only. */
+export const canEditTenders = (user) => ['analyst', 'manager', 'admin'].includes(user?.role);

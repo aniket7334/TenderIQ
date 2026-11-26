@@ -121,7 +121,8 @@ router.post('/live/:id/sync', auth_1.authenticate, (0, auth_1.requireRole)('admi
         res.json(info);
     }
     catch (err) {
-        res.status(502).json({ detail: `Sync failed: ${err.message}` });
+        console.error(`[Live sources] sync of ${req.params.id} failed:`, err);
+        res.status(502).json({ detail: 'Sync failed — the source did not answer. Please try again shortly.' });
     }
 });
 // POST /scrape-type/:adapter - Scrape only the source(s) of one portal, e.g. "gem"

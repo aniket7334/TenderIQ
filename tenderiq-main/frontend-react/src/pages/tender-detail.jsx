@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
 import DocumentsPanel from '@/components/tender/documents-panel';
 import HowToApply from '@/components/tender/how-to-apply';
+import useAuth, { canEditTenders } from '@/hooks/useAuth';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
 
 export default function TenderDetailPage() {
@@ -367,6 +368,8 @@ export default function TenderDetailPage() {
 
   // Live tenders (Europe from TED, UK from Find a Tender) aren't stored: no notes/history/shortlist
   const isLive = !!tender.is_live;
+  // Viewers are read-only
+  const canEdit = canEditTenders(useAuth.getState().user);
   const money = (v, cur) => {
     try {
       return new Intl.NumberFormat('en-GB', { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(v);
@@ -477,7 +480,7 @@ export default function TenderDetailPage() {
           <p className="mt-1 text-sm text-gray-500">{[tender.organization, isLive && tender.location].filter(Boolean).join(' · ')}</p>
         </div>
         <div className="flex flex-wrap gap-2 xl:max-w-[52%] xl:flex-shrink-0 xl:justify-end">
-          {!isLive && (
+          {!isLive && canEdit && (
           <Button
             onClick={handleShortlist}
             variant={tender.internal_status === 'interested' ? 'primary' : 'outline'}
@@ -496,7 +499,7 @@ export default function TenderDetailPage() {
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Download</span>
           </Button>
-          {!isLive && (
+          {!isLive && canEdit && (
           <>
           <Button
             onClick={handleFetchFromSource}

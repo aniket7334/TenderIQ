@@ -83,7 +83,7 @@ router.get('/dashboard', auth_1.authenticate, async (_req, res) => {
 });
 
 // POST /extract-costs - Extract estimated costs from tender titles for all tenders missing values
-router.post('/extract-costs', auth_1.authenticate, async (_req, res) => {
+router.post('/extract-costs', auth_1.authenticate, (0, auth_1.requireRole)('manager', 'admin'), async (_req, res) => {
     try {
         function extractCost(text) {
             if (!text) return null;
@@ -318,7 +318,8 @@ router.post('/tenders/:id/infographic', auth_1.authenticate, async (req, res) =>
         });
     } catch (err) {
         console.error('Infographic generation error:', err);
-        res.status(500).json({ detail: err.message || 'Failed to generate infographic' });
+        console.error('[Infographic] failed:', err);
+        res.status(500).json({ detail: 'Failed to generate the infographic. Please try again.' });
     }
 });
 
@@ -377,7 +378,8 @@ router.get('/live-tenders', auth_1.authenticate, async (req, res) => {
         res.json(result);
     } catch (err) {
         console.error('Live tenders error:', err);
-        res.status(500).json({ detail: err.message || 'Failed to fetch live tenders' });
+        console.error('[Live tenders] failed:', err);
+        res.status(500).json({ detail: 'Failed to fetch live tenders. Please try again.' });
     }
 });
 
@@ -471,7 +473,8 @@ router.post('/live-tenders/import', auth_1.authenticate, (0, auth_1.requireRole)
         });
     } catch (err) {
         console.error('Live tenders import error:', err);
-        res.status(500).json({ detail: err.message || 'Failed to import live tenders' });
+        console.error('[Live tenders import] failed:', err);
+        res.status(500).json({ detail: 'Failed to import live tenders. Please try again.' });
     }
 });
 

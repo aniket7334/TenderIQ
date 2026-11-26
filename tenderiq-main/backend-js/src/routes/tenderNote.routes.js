@@ -116,7 +116,7 @@ router.get('/', auth_1.authenticate, async (req, res) => {
     }
 });
 // POST /generate
-router.post('/generate', auth_1.authenticate, async (req, res) => {
+router.post('/generate', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const { tender_id, template_id } = req.body;
         if (!tender_id) {
@@ -133,7 +133,7 @@ router.post('/generate', auth_1.authenticate, async (req, res) => {
     }
 });
 // POST /generate/:tender_id
-router.post('/generate/:tender_id', auth_1.authenticate, async (req, res) => {
+router.post('/generate/:tender_id', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const { template_id } = req.body;
         const tenderId = req.params.tender_id;
@@ -159,7 +159,7 @@ router.get('/:note_id', auth_1.authenticate, async (req, res) => {
     }
 });
 // PATCH /:note_id
-router.patch('/:note_id', auth_1.authenticate, async (req, res) => {
+router.patch('/:note_id', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const { html_content, content, status } = req.body;
         const data = {};

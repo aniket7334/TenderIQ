@@ -25,7 +25,8 @@ async function registerUser(email, password, fullName) {
         [email]
     );
     if (existing.length > 0) {
-        throw new AppError('Email already registered', 409);
+        // Neutral wording: don't confirm which emails have accounts
+        throw new AppError('An account could not be created with these details. If you already have an account, please sign in.', 409);
     }
 
     const passwordHash = await bcrypt.hash(password, 12);

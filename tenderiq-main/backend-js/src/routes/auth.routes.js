@@ -39,6 +39,7 @@ const authService = __importStar(require("../services/auth.service"));
 const auth_1 = require("../middleware/auth");
 const errorHandler_1 = require("../middleware/errorHandler");
 const router = (0, express_1.Router)();
+const { loginGuard, passwordProblem } = require('../middleware/security');
 const RegisterSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
     password: zod_1.z.string().min(1),
@@ -55,6 +56,10 @@ const RefreshSchema = zod_1.z.object({
 router.post('/register', async (req, res) => {
     try {
         const data = RegisterSchema.parse(req.body);
+        // Same password rule as the sign-up page — enforced on the server too
+        const weak = passwordProblem(data.password);
+        if (weak)
+            return res.status(422).json({ detail: weak });
         const tokens = await authService.registerUser(data.email, data.password, data.full_name);
         res.status(201).json(tokens);
     }
@@ -72,8 +77,22 @@ router.post('/login', async (req, res) => {
         const email = data.email || data.username;
         if (!email)
             throw new errorHandler_1.AppError('Email is required', 422);
-        const tokens = await authService.loginUser(email, data.password);
-        res.json(tokens);
+        // Too many wrong passwords for this email from this network → locked for a while
+        const locked = loginGuard.lockedMinutes(req, email);
+        if (locked)
+            return res.status(429).json({ detail: `Too many failed sign-in attempts. Please try again in ${locked} minute${locked === 1 ? '' : 's'}.` });
+        try {
+            const tokens = await authService.loginUser(email, data.password);
+            loginGuard.succeeded(req, email);
+            return res.json(tokens);
+        }
+        catch (loginErr) {
+            if (loginErr instanceof errorHandler_1.AppError && loginErr.statusCode === 401) {
+                loginGuard.failed(req, email);
+                require('../services/audit.service').logAction?.(null, 'auth', null, 'login_failed', { email: String(email).toLowerCase(), ip: req.ip }, req.ip)?.catch?.(() => {});
+            }
+            throw loginErr;
+        }
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError)

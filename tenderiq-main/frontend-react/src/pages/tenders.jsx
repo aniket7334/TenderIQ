@@ -26,6 +26,7 @@ import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/li
 import toast from 'react-hot-toast';
 import { useLiveTenders } from '@/hooks/useLiveTenders';
 import { LiveStatus } from '@/components/ui/live-status';
+import useAuth, { canEditTenders } from '@/hooks/useAuth';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -181,6 +182,8 @@ function TendersPageContent() {
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedCountry, setSelectedCountry] = useState(searchParams.get('country') || '');
   // Europe (TED) and UK (Find a Tender) regions are loaded live (not stored); they can also filter by city
+  // Viewers are read-only (no shortlist stars)
+  const canEdit = canEditTenders(useAuth((s) => s.user));
   const europeMode = isLiveRegion(selectedCountry);
   const ukMode = isUkRegion(selectedCountry);
   const wbMode = isWorldBankRegion(selectedCountry);
@@ -1119,7 +1122,7 @@ function TendersPageContent() {
                             <button
                               onClick={(e) => handleShortlist(tender.id, e)}
                               title={tender.internal_status === 'interested' ? 'Remove from shortlist' : 'Shortlist tender'}
-                              className={`${tender.is_live ? 'hidden ' : ''}rounded-lg p-1.5 transition-colors ${
+                              className={`${tender.is_live || !canEdit ? 'hidden ' : ''}rounded-lg p-1.5 transition-colors ${
                                 tender.internal_status === 'interested'
                                   ? 'text-amber-500 hover:bg-amber-50'
                                   : 'text-gray-400 hover:bg-amber-50 hover:text-amber-500'
@@ -1221,7 +1224,7 @@ function TendersPageContent() {
                       <button
                         onClick={(e) => handleShortlist(tender.id, e)}
                         title={tender.internal_status === 'interested' ? 'Remove from shortlist' : 'Shortlist tender'}
-                        className={`${tender.is_live ? 'hidden ' : ''}rounded-lg p-2 ${
+                        className={`${tender.is_live || !canEdit ? 'hidden ' : ''}rounded-lg p-2 ${
                           tender.internal_status === 'interested'
                             ? 'text-amber-500 hover:bg-amber-50'
                             : 'text-gray-500 hover:bg-amber-50 hover:text-amber-500'

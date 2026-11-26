@@ -187,7 +187,7 @@ router.get('/:tender_id', auth_1.authenticate, async (req, res) => {
     }
 });
 // PATCH /:tender_id - Update tender (analyst or admin)
-router.patch('/:tender_id', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'admin'), async (req, res) => {
+router.patch('/:tender_id', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const tenderId = req.params.tender_id;
         const updated = await tenderService.updateTender(tenderId, req.body);
@@ -203,7 +203,7 @@ router.patch('/:tender_id', auth_1.authenticate, (0, auth_1.requireRole)('analys
     }
 });
 // POST /:tender_id/shortlist - Shortlist tender
-router.post('/:tender_id/shortlist', auth_1.authenticate, async (req, res) => {
+router.post('/:tender_id/shortlist', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const tenderId = req.params.tender_id;
         const updated = await tenderService.shortlistTender(tenderId);
@@ -217,7 +217,7 @@ router.post('/:tender_id/shortlist', auth_1.authenticate, async (req, res) => {
     }
 });
 // POST /:tender_id/tags - Add tag
-router.post('/:tender_id/tags', auth_1.authenticate, async (req, res) => {
+router.post('/:tender_id/tags', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const { tag_name } = req.body;
         if (!tag_name) {
@@ -234,7 +234,7 @@ router.post('/:tender_id/tags', auth_1.authenticate, async (req, res) => {
     }
 });
 // DELETE /:tender_id/tags/:tag_name - Remove tag
-router.delete('/:tender_id/tags/:tag_name', auth_1.authenticate, async (req, res) => {
+router.delete('/:tender_id/tags/:tag_name', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const tenderId = req.params.tender_id;
         const tagName = req.params.tag_name;
@@ -248,7 +248,7 @@ router.delete('/:tender_id/tags/:tag_name', auth_1.authenticate, async (req, res
     }
 });
 // POST /:tender_id/tags/:tag_name/delete - Remove tag via POST (workaround for hosts blocking DELETE)
-router.post('/:tender_id/tags/:tag_name/delete', auth_1.authenticate, async (req, res) => {
+router.post('/:tender_id/tags/:tag_name/delete', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const tenderId = req.params.tender_id;
         const tagName = req.params.tag_name;
@@ -262,7 +262,7 @@ router.post('/:tender_id/tags/:tag_name/delete', auth_1.authenticate, async (req
     }
 });
 // POST /:tender_id/comments - Add comment
-router.post('/:tender_id/comments', auth_1.authenticate, async (req, res) => {
+router.post('/:tender_id/comments', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const { comment } = req.body;
         if (!comment) {
@@ -316,7 +316,7 @@ router.get('/:tender_id/history', auth_1.authenticate, async (req, res) => {
     }
 });
 // POST /:tender_id/fetch-details - Re-fetch details from third-party source
-router.post('/:tender_id/fetch-details', auth_1.authenticate, async (req, res) => {
+router.post('/:tender_id/fetch-details', auth_1.authenticate, (0, auth_1.requireRole)('analyst', 'manager', 'admin'), async (req, res) => {
     try {
         const tenderId = req.params.tender_id;
         const { pool } = require('../db');
