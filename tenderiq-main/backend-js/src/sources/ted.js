@@ -382,6 +382,12 @@ async function getDocuments(id) {
 
 const isLiveId = (id) => String(id || '').startsWith(ID_PREFIX);
 
+/** Small status for /health: open Europe tenders (cached count) and the last TED problem. */
+async function tedHealth() {
+    const open_tenders = await countEurope({ waitMs: 8000 });
+    return { status: open_tenders != null ? 'ok' : 'unreachable', open_tenders, last_ok_at: health.last_ok_at, last_error: health.last_error, last_error_at: health.last_error_at };
+}
+
 /**
  * TED as a "live source" for the Sources page. `fresh` skips the cache so
  * "Check now" really asks TED (one small request).
@@ -433,7 +439,7 @@ async function countEurope({ waitMs = 6000 } = {}) {
 
 module.exports = {
     EUROPE, EUROPE_COUNTRIES, isEuropeRegion, isLiveId,
-    searchTenders, getTender, getDocuments, countEurope, sourceInfo,
+    searchTenders, getTender, getDocuments, countEurope, sourceInfo, tedHealth,
     // for tests
     categoriesFromCpv, categoryClause, tedDate,
     // shared with the UK source (same CPV system)

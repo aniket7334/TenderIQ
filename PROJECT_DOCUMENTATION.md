@@ -163,7 +163,7 @@ Base path: **`/api/v1`**. All routes except auth and `/health` need a `Authoriza
 ### Health
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/health` | Server + DB status, plus `gem_sync` (running, last run, last success, new tenders, listings read, last error) `uk_live` (UK snapshot: ready/loading, open tenders, last sync), `worldbank_live` (open notices, non-English, translated) and `translation` (OpenAI on/paused, last error) |
+| GET | `/health` | Server + DB status, plus `gem_sync` (running, last run, last success, new tenders, listings read, last error) `ted_live` (Europe: open tenders from TED, last TED error — checks Render can reach TED), `uk_live` (UK snapshot: ready/loading, open tenders, last sync), `worldbank_live` (open notices, non-English, translated) and `translation` (OpenAI on/paused, last error) |
 
 ### Auth — `/auth`
 `POST /register`, `POST /login`, `POST /refresh`, `GET /me`, `POST /oauth/:provider`
@@ -533,6 +533,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 27. **TED in the Sources tab** — TED listed as a row in Admin → Sources next to GeM (Active, last checked, success rate, open tenders; Check now / Open Europe tenders). Fixed the Success Rate column showing 5000% (it multiplied a percentage by 100).
 28. **United Kingdom, live from Find a Tender** — Region group "United Kingdom — live from Find a Tender" (All UK + 4 nations), City filter, tender page with Documents and How to apply, UK in Dashboard total, Find a Tender row in Sources; UK tenders kept in server memory (refreshed every 30 min), never in the database; live sources now go through `src/sources/index.js`.
 29. **Worldwide, live from the World Bank** — Region group "Worldwide — live from the World Bank" (all + ~100 countries), ~600 open notices kept in memory (30-min refresh), French/Spanish/Portuguese matched through a built-in glossary and translated with OpenAI when credit is available (paused automatically otherwise), Overview/Documents (full notice text)/How to apply (contact person, email, phone), World Bank in Dashboard total and Sources.
+30. **Region list clean-up** — removed the empty "United Nations" option (UNGM blocks automated access, so there is no UN source); `/health` reports TED reachability (`ted_live`).
+
 
 ---
 

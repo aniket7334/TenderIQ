@@ -28,9 +28,8 @@ export const ALL_COUNTRIES = ISO_CODES.map((code) => {
 }).sort((a, b) => a.label.localeCompare(b.label));
 
 /** Multilateral funders that publish tenders but aren't countries. */
-export const INTERNATIONAL_REGIONS = [
-  { value: 'United Nations', label: 'United Nations', flag: '🇺🇳' },
-];
+// UN tenders (UNGM) are not available: UNGM blocks automated access. Kept empty on purpose.
+export const INTERNATIONAL_REGIONS = [];
 
 /* Europe: tenders for these regions are shown live from TED (the EU's official
    tender journal) by the API — nothing is stored. Must match the backend's

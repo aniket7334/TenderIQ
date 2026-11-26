@@ -21,7 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
-import { ALL_COUNTRIES, INTERNATIONAL_REGIONS, EUROPE, EUROPE_COUNTRY_NAMES, UK, UK_NATIONS, isUkRegion, isLiveRegion, WORLD_BANK, isWorldBankRegion } from '@/lib/countries';
+import { ALL_COUNTRIES, EUROPE, EUROPE_COUNTRY_NAMES, UK, UK_NATIONS, isUkRegion, isLiveRegion, WORLD_BANK, isWorldBankRegion } from '@/lib/countries';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useLiveTenders } from '@/hooks/useLiveTenders';
@@ -585,13 +585,7 @@ function TendersPageContent() {
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="International">
-                {INTERNATIONAL_REGIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.flag} {opt.label}
-                  </option>
-                ))}
-              </optgroup>
+              {/* No "United Nations" option: UNGM (where UN agencies publish) blocks automated access */}
               <optgroup label="All countries">
                 {ALL_COUNTRIES.filter((c) => !regionFacets.some((r) => r.country === c.value) && !EUROPE_COUNTRY_NAMES.includes(c.value) && c.value !== UK).map((opt) => (
                   <option key={opt.code} value={opt.value}>

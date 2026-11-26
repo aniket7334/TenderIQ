@@ -51,6 +51,8 @@ app.get('/health', async (_req, res) => {
             gem_sync: await require('./src/workers/scrapeTasks').getGemSyncStatus().catch(() => null),
             // UK tenders (Find a Tender) kept in memory, not stored
             uk_live: await require('./src/sources/fts').health().catch(() => null),
+            // Europe (TED): live count (cached 10 min) + last TED error, so reachability can be checked without signing in
+            ted_live: await require('./src/sources/ted').tedHealth().catch(() => null),
             worldbank_live: await require('./src/sources/worldbank').status().catch(() => null),
             translation: require('./src/sources/translate').translationStats(),
         });
