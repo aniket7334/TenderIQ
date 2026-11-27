@@ -91,6 +91,15 @@ router.post('/scrape-all', auth_1.authenticate, (0, auth_1.requireRole)('admin')
         res.status(500).json({ detail: 'Internal server error' });
     }
 });
+// GET /scrape-all/status - Progress of the "all sources" run (Refresh button on the Tenders page)
+router.get('/scrape-all/status', auth_1.authenticate, async (_req, res) => {
+    try {
+        res.json(await (0, scrapeTasks_1.getScrapeAllStatus)());
+    }
+    catch (err) {
+        res.status(500).json({ detail: 'Could not read the scrape status' });
+    }
+});
 // GET /live - Sources read live and never stored (TED for Europe), with a health check.
 // ?fresh=1 asks TED again instead of using the 10-minute cache. Defined before /:source_id.
 router.get('/live', auth_1.authenticate, async (req, res) => {

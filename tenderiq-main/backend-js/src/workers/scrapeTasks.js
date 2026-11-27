@@ -306,19 +306,46 @@ async function scrapeSource(sourceId, opts = {}) {
     }
 }
 
-async function scrapeAllSources() {
-    const [sources] = await pool.execute(
-        'SELECT * FROM tender_sources WHERE is_active = 1 ORDER BY priority DESC'
-    );
-    for (const source of sources) {
-        try {
-            await scrapeSource(source.id);
+// Progress of the "all sources" run (hourly job or the Refresh button), for GET /sources/scrape-all/status
+let allRun = { running: false, startedAt: null, finishedAt: null, total: 0, done: 0, current: null, failed: [] };
+let allRunPromise = null;
+
+/** Scrape every active source, one after another. A second call while one runs joins it. */
+function scrapeAllSources() {
+    if (allRunPromise) return allRunPromise;
+    allRunPromise = (async () => {
+        const [sources] = await pool.execute(
+            'SELECT * FROM tender_sources WHERE is_active = 1 ORDER BY priority DESC'
+        );
+        allRun = { running: true, startedAt: new Date(), finishedAt: null, total: sources.length, done: 0, current: null, failed: [] };
+        for (const source of sources) {
+            allRun.current = source.name;
+            try {
+                await scrapeSource(source.id);
+            }
+            catch (err) {
+                allRun.failed.push(source.name);
+                console.error(`Failed to scrape source ${source.name}:`, err);
+            }
+            allRun.done++;
         }
-        catch (err) {
-            console.error(`Failed to scrape source ${source.name}:`, err);
-        }
-    }
+    })().finally(() => {
+        allRun = { ...allRun, running: false, current: null, finishedAt: new Date() };
+        allRunPromise = null;
+    });
+    return allRunPromise;
 }
+
+/** Where the "all sources" run is, and how many tenders it has added so far. */
+async function getScrapeAllStatus() {
+    let newTenders = 0;
+    if (allRun.startedAt) {
+        const [[r]] = await pool.query('SELECT COUNT(*) AS n FROM tenders WHERE created_at >= ?', [allRun.startedAt]);
+        newTenders = Number(r.n);
+    }
+    return { ...allRun, newTenders };
+}
+exports.getScrapeAllStatus = getScrapeAllStatus;
 
 /**
  * Live GeM sync: fetch only bids published since the last run (newest-first,
@@ -416,6 +443,46 @@ const BUILT_IN_SOURCES = [
         priority: 7,
         config: { org, ...(location ? { location } : {}), ...(state ? { state } : {}) },
     })),
+    // Maritime boards, harbour engineering and coastal bodies on the
+    // state e-procurement portals. No city: these bodies work along the whole coast, so the
+    // city comes from each tender's own words; the state is known.
+    ...[
+        ['mmb', 'Maharashtra Maritime Board', 'https://mahatenders.gov.in', 'Maharashtra Maritime Board Mumbai', 'Maharashtra'],
+        ['tn_minor_ports', 'Tamil Nadu Minor Ports (TN Maritime Board)', 'https://tntenders.gov.in', 'Minor Ports', 'Tamil Nadu'],
+        ['kl_hed', 'Kerala Harbour Engineering Department', 'https://etenders.kerala.gov.in', 'Harbour Engineering Department', 'Kerala'],
+        ['kmb', 'Kerala Maritime Board', 'https://etenders.kerala.gov.in', 'Kerala Maritime Board', 'Kerala'],
+        ['vizhinjam', 'Vizhinjam International Seaport', 'https://etenders.kerala.gov.in', 'Vizhinjam International Seaport Ltd', 'Kerala'],
+        ['kl_coastal', 'Kerala Coastal Area Development Corp.', 'https://etenders.kerala.gov.in', 'Kerala State Coastal Area Development Corporation', 'Kerala'],
+        ['kl_water_transport', 'Kerala State Water Transport', 'https://etenders.kerala.gov.in', 'State Water Transport Department', 'Kerala'],
+        ['od_ports', 'Odisha Ports and Inland Water Transport', 'https://tendersodisha.gov.in', 'Directorate of Ports and IWT', 'Odisha'],
+    ].map(([key, name, host, org, state]) => ({
+        migration: `source_${key}_2026_11`,
+        name,
+        base_url: host,
+        adapter_type: 'nic_state',
+        scrape_interval_minutes: 60,
+        priority: 7,
+        config: { host, org, state, ...(key === 'vizhinjam' ? { location: 'Vizhinjam' } : {}) },
+    })),
+    {
+        // Karnataka's ports and inland waterways (the Karnataka Maritime Board's works) on KPPP
+        migration: 'source_karnataka_ports_2026_11',
+        name: 'Karnataka Ports and Inland Water Transport (KPPP)',
+        base_url: 'https://kppp.karnataka.gov.in',
+        adapter_type: 'kppp',
+        scrape_interval_minutes: 60,
+        priority: 7,
+        config: { org: 'Infrastructure Development Ports And Inland Water Transport Department', deptIds: [43] },
+    },
+    {
+        migration: 'source_gmb_2026_11',
+        name: 'Gujarat Maritime Board',
+        base_url: 'https://gmbports.org',
+        adapter_type: 'gmb',
+        scrape_interval_minutes: 60,
+        priority: 7,
+        config: { org: 'Gujarat Maritime Board', state: 'Gujarat' },
+    },
     {
         migration: 'source_cochin_port_2026_11',
         name: 'Cochin Port Authority',

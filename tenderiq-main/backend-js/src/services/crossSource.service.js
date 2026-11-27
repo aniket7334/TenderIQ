@@ -297,17 +297,35 @@ async function whereToApply(tender) {
     const ids = idRows.map((r) => r.ident);
     const gemIds = ids.filter((i) => i.startsWith('GEM/'));
     const cppIds = ids.filter((i) => !i.startsWith('GEM/'));
-    const portalFor = (adapter) => (adapter === 'etenders' ? { name: 'eTenders (etenders.gov.in)', url: ETENDERS_SEARCH } : { name: 'CPPP (eprocure.gov.in)', url: CPPP_SEARCH });
+    const portalFor = (adapter, url) => {
+        if (adapter === 'etenders') return { name: 'eTenders (etenders.gov.in)', url: ETENDERS_SEARCH };
+        if (adapter === 'nic_state') {
+            // the state portal the tender came from: its own search page
+            let host = null;
+            try { host = new URL(url).host; } catch { /* no address */ }
+            return host ? { name: host, url: `https://${host}/nicgep/app?page=FrontEndAdvancedSearch&service=page` } : { name: 'CPPP (eprocure.gov.in)', url: CPPP_SEARCH };
+        }
+        return { name: 'CPPP (eprocure.gov.in)', url: CPPP_SEARCH };
+    };
 
     const sourceLink = (adapter, name, url, ref) => {
         if (adapter === 'gem') {
             add({ source: 'GeM', role: 'apply', label: 'Bid on GeM', url: url || GEM_SEARCH, id: ref || gemIds[0] || null,
                 how: url ? 'The bid on GeM. Sign in to GeM as a seller to submit your bid.' : 'Search this bid number on GeM, then sign in as a seller to bid.' });
         }
-        else if (adapter === 'etenders' || adapter === 'cppp' || adapter === 'cppp_org') {
-            const p = portalFor(adapter);
+        else if (adapter === 'etenders' || adapter === 'cppp' || adapter === 'cppp_org' || adapter === 'nic_state') {
+            const p = portalFor(adapter, url);
             add({ source: `${name} — ${p.name}`, role: 'apply', label: 'Bid on the e-procurement portal', url: p.url, id: cppIds[0] || ref || null,
                 how: 'Search this Tender ID on the portal (it asks for a captcha), then sign in to bid. Direct links there expire.' });
+        }
+        else if (adapter === 'kppp') {
+            add({ source: `${name} — kppp.karnataka.gov.in`, role: 'apply', label: 'Bid on KPPP', url: 'https://kppp.karnataka.gov.in/portal/searchTender/live', id: ref || null,
+                how: 'Search this tender number in "Live Tenders" on the Karnataka Public Procurement Portal, then sign in as a bidder.' });
+        }
+        else if (adapter === 'gmb') {
+            add({ source: 'Gujarat Maritime Board — nProcure', role: 'apply', label: 'Bid on nProcure', url: 'https://gmbtender.nprocure.com/', id: null,
+                how: "The board takes bids on its nProcure portal: find this tender in the board's list there, then sign in to bid." });
+            if (url) add({ source: name, role: 'view', label: `${name} — tenders page`, url, id: null, how: "The notice on the board's own website." });
         }
         else if (url) {
             add({ source: name, role: 'view', label: `${name} — tender page`, url, id: ref || null, how: "Notice and documents on the buyer's own website." });
@@ -321,7 +339,8 @@ async function whereToApply(tender) {
     for (const a of aliases) sourceLink(a.adapter_type, a.source_name, a.source_url, a.reference_no);
     // 3. Bidding portals its official IDs point to, if not linked yet
     if (gemIds.length && !links.some((l) => l.source === 'GeM')) sourceLink('gem', 'GeM', null, gemIds[0]);
-    if (cppIds.length && !links.some((l) => l.role === 'apply' && /CPPP|eTenders/.test(l.source))) {
+    // (an NIC portal link — CPPP, eTenders or a state portal — already covers its Tender ID)
+    if (cppIds.length && !links.some((l) => l.role === 'apply' && l.source !== 'GeM')) {
         add({ source: 'CPPP (eprocure.gov.in)', role: 'apply', label: 'Bid on CPPP', url: CPPP_SEARCH, id: cppIds[0],
             how: 'This buyer takes bids on the Central Public Procurement Portal: search this Tender ID there (captcha), then sign in to bid.' });
     }

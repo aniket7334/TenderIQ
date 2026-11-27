@@ -69,16 +69,18 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
             const org = this.config?.org || '';
             console.log(`[${this.portalName}] Fetching page ${page} for org: "${org}"...`);
             const host = this.config?.host || this.portalHost;
+            // State portals (mahatenders, tntenders …) run the same software under /nicgep/app
+            const appPath = this.config?.appPath || '/eprocure/app';
             const headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             };
             const response = page === 1
-                ? await axios_1.default.get(`${host}/eprocure/app`, {
+                ? await axios_1.default.get(`${host}${appPath}`, {
                     params: { page: 'FrontEndLatestActiveTendersOrgwise', service: 'page', org },
                     headers, timeout: 30000,
                 })
-                : await axios_1.default.get(`${host}/eprocure/app`, {
+                : await axios_1.default.get(`${host}${appPath}`, {
                     params: {
                         component: '$TablePages.linkPage', page: 'FrontEndLatestActiveTendersOrgwise', service: 'direct',
                         session: 'T', sp: ['AFrontEndLatestActiveTendersOrgwise,table', String(page)],
@@ -117,7 +119,10 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
                     lowerTitle.includes('version :') || lowerTitle.includes('screen resolution') ||
                     lowerTitle.includes('all rights reserved') || lowerTitle.includes('latest tender documents issued') ||
                     // the table's own header row, written with <td> instead of <th>
-                    lowerTitle.startsWith('title and ref') || /^e-?published date$/i.test(publishedDateStr))
+                    lowerTitle.startsWith('title and ref') || /^e-?published date$/i.test(publishedDateStr) ||
+                    // state portals put announcement banners in table rows ("« Bidders who are using …"):
+                    // a real tender row always has a published date like "23-Nov-2026 06:00 PM"
+                    !/\d{1,2}-[A-Za-z]{3}-\d{4}/.test(publishedDateStr))
                     return;
                 // Parse dates
                 const issueDate = (0, dateNormalizer_1.parseDate)(publishedDateStr) || undefined;
@@ -237,4 +242,16 @@ class CpppOrgAdapter extends EtendersAdapter {
     portalName = 'CPPP org';
 }
 exports.CpppOrgAdapter = CpppOrgAdapter;
+/**
+ * A state e-procurement portal on the same NIC software (mahatenders.gov.in, tntenders.gov.in,
+ * etenders.kerala.gov.in, tendersodisha.gov.in …): config.host is the portal, the app lives
+ * under /nicgep/app. Used for the maritime boards, harbour engineering and fisheries departments.
+ */
+class NicStateAdapter extends EtendersAdapter {
+    portalName = 'State portal';
+    constructor(baseUrl, config) {
+        super(baseUrl, { appPath: '/nicgep/app', ...(config || {}), host: (config && config.host) || baseUrl });
+    }
+}
+exports.NicStateAdapter = NicStateAdapter;
 //# sourceMappingURL=etendersAdapter.js.map

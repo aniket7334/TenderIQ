@@ -10,6 +10,8 @@ const etendersAdapter_1 = require("./etendersAdapter");
 const { MbptAdapter } = require("./mbptAdapter");
 const { DpaAdapter } = require("./dpaAdapter");
 const { CopaAdapter } = require("./copaAdapter");
+const { GmbAdapter } = require("./gmbAdapter");
+const { KpppAdapter } = require("./kpppAdapter");
 const registry = new Map();
 registry.set('generic', genericListingAdapter_1.GenericListingAdapter);
 registry.set('gem', gemAdapter_1.GemAdapter);
@@ -18,12 +20,18 @@ registry.set('ireps', irepsAdapter_1.IrepsAdapter);
 registry.set('etenders', etendersAdapter_1.EtendersAdapter);
 // One organisation's tenders on CPPP (eprocure.gov.in): JNPA, Kolkata, New Mangalore …
 registry.set('cppp_org', etendersAdapter_1.CpppOrgAdapter);
+// One organisation on a state e-procurement portal (mahatenders, tntenders, Kerala, Odisha …)
+registry.set('nic_state', etendersAdapter_1.NicStateAdapter);
 // Mumbai Port Authority's own tender pages (mumbaiport.gov.in)
 registry.set('mbpt', MbptAdapter);
 // Deendayal Port Authority, Kandla (deendayalport.gov.in JSON API)
 registry.set('dpa', DpaAdapter);
 // Cochin Port Authority (cochinport.gov.in — without www)
 registry.set('copa', CopaAdapter);
+// Gujarat Maritime Board's own live-tenders list (gmbports.org)
+registry.set('gmb', GmbAdapter);
+// Karnataka Public Procurement Portal (JSON API), chosen departments
+registry.set('kppp', KpppAdapter);
 function getAdapter(adapterType, baseUrl, config) {
     const Ctor = registry.get(adapterType) || genericListingAdapter_1.GenericListingAdapter;
     return new Ctor(baseUrl, config);
