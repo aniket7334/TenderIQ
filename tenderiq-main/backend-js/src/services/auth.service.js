@@ -59,7 +59,8 @@ async function registerUser(email, password, fullName) {
     );
     await account.assignUserCode(id).catch((e) => console.error('[Accounts] user ID not assigned:', e.message));
 
-    if (!approved) await account.notifyAdminsOfSignup(fullName, email);
+    // Every new account → in-app alert to the admins (in the background: sign-up stays fast)
+    account.notifyAdminsOfNewAccount(id).catch(() => {});
     return {
         pending: !approved,
         message: approved

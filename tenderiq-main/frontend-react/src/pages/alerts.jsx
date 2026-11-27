@@ -18,6 +18,7 @@ import {
   Settings as SettingsIcon,
   Sparkles,
   Trash2,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
@@ -49,6 +50,9 @@ const ALERT_STYLES = {
   new_tenders_digest: { icon: Layers, cls: 'bg-emerald-50 text-emerald-700 ring-emerald-100', label: 'New tenders' },
   deadline: { icon: Hourglass, cls: 'bg-amber-50 text-amber-700 ring-amber-100', label: 'Closing soon' },
   deadline_digest: { icon: Clock, cls: 'bg-amber-50 text-amber-700 ring-amber-100', label: 'Closing soon' },
+  // Admins only: every new account (sign-up waiting for approval / account created)
+  signup_pending: { icon: UserPlus, cls: 'bg-blue-50 text-blue-700 ring-blue-100', label: 'Sign-up · needs approval' },
+  account_created: { icon: UserPlus, cls: 'bg-blue-50 text-blue-700 ring-blue-100', label: 'New account' },
 };
 const alertStyle = (t) => ALERT_STYLES[t] || { icon: Info, cls: 'bg-gray-100 text-gray-600 ring-gray-200', label: 'Update' };
 
@@ -199,6 +203,7 @@ export default function AlertsPage() {
     markRead(alert);
     if (alert.tender_id) navigate(`/tenders/${alert.tender_id}`);
     else if (/digest/.test(alert.alert_type)) navigate('/tenders');
+    else if (alert.alert_type === 'signup_pending' || alert.alert_type === 'account_created') navigate('/admin/users');
   };
 
   const anyOn = settings?.notify_new_tenders || settings?.notify_deadlines;

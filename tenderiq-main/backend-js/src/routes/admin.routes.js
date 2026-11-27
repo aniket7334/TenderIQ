@@ -245,6 +245,8 @@ router.post('/users', async (req, res) => {
             [id, email, hashedPassword, full_name, role || 'viewer', true]
         );
         await require('../services/account.service').assignUserCode(id).catch((e) => console.error('[Accounts] user ID not assigned:', e.message));
+        // Tell the other admins (in-app alert), in the background
+        require('../services/account.service').notifyAdminsOfNewAccount(id, { createdById: req.user.id }).catch(() => {});
         const [rows] = await pool.execute(
             'SELECT id, user_code, email, full_name, role, is_active, created_at, last_login_at FROM users WHERE id = ?', [id]
         );

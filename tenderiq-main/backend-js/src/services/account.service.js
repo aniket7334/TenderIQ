@@ -108,21 +108,48 @@ function isAutoApproved(email) {
     return !!domain && autoApproveDomains().includes(domain);
 }
 
-/** Tell every active admin about a new sign-up (in-app alert: bell + Alerts page). */
-async function notifyAdminsOfSignup(fullName, email) {
+/**
+ * Tell the admins about EVERY new account — self sign-up (pending or auto-approved) or
+ * created by an admin: an in-app alert for every active admin (bell + Alerts page; the
+ * admin who created the account doesn't get one). Email alerts are planned for later.
+ * Runs after the account is saved; never fails the sign-up. Returns how many were alerted.
+ */
+async function notifyAdminsOfNewAccount(userId, { createdById = null } = {}) {
+    const result = { in_app: 0 };
     try {
-        const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND is_active = 1");
+        const [[u]] = await pool.query(
+            'SELECT id, user_code, email, full_name, role, signup_status, created_at FROM users WHERE id = ?', [userId]);
+        if (!u) return result;
+        const pending = u.signup_status === 'pending';
+        let createdByName = null;
+        if (createdById) {
+            const [[by]] = await pool.query('SELECT full_name, user_code FROM users WHERE id = ?', [createdById]);
+            if (by) createdByName = `${by.full_name}${by.user_code ? ` (${by.user_code})` : ''}`;
+        }
+        const who = `${u.full_name} (${u.email}${u.user_code ? `, ${u.user_code}` : ''})`;
+        const message = pending
+            ? `New sign-up waiting for approval: ${who}. Approve or reject it in Admin → Users.`
+            : createdByName
+                ? `New account created by ${createdByName}: ${who} as ${u.role}.`
+                : `New account created: ${who} signed up and was approved automatically.`;
+
+        const [admins] = await pool.query(
+            "SELECT id FROM users WHERE role = 'admin' AND is_active = 1 AND (? IS NULL OR id <> ?)", [createdById, createdById]);
         for (const a of admins) {
             await pool.execute(
                 'INSERT INTO alerts (id, user_id, alert_type, message, tender_id, created_at) VALUES (?, ?, ?, ?, NULL, NOW())',
-                [uuidv4(), a.id, 'signup_pending', `New sign-up waiting for approval: ${fullName} (${email}). Approve or reject it in Admin → Users.`]
+                [uuidv4(), a.id, pending ? 'signup_pending' : 'account_created', message.slice(0, 1000)]
             );
         }
+        result.in_app = admins.length;
     }
     catch (err) {
         console.error('[Accounts] could not notify admins:', err.message);
     }
+    return result;
 }
+// Older name, kept for any caller still using it
+const notifyAdminsOfSignup = (userId) => notifyAdminsOfNewAccount(userId);
 
 /* ------------------------------------------------------------------ */
 /*  Sessions                                                           */
@@ -167,6 +194,6 @@ async function revokeAllSessions(userId) {
 
 module.exports = {
     ensureSchema, isReady: () => ready, assignUserCode,
-    isAutoApproved, notifyAdminsOfSignup,
+    isAutoApproved, notifyAdminsOfSignup, notifyAdminsOfNewAccount,
     createSession, sessionIsValid, touchSession, revokeSession, revokeAllSessions,
 };
