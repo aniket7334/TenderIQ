@@ -17,6 +17,7 @@ import {
   Columns3,
   Plus,
   Globe,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,6 +140,23 @@ const CATEGORY_OPTIONS = [
   { value: 'Breakwater', label: 'Breakwater', color: 'bg-indigo-100 text-indigo-700' },
   { value: 'Harbour', label: 'Harbour', color: 'bg-sky-100 text-sky-700' },
   { value: 'Dredging', label: 'Dredging', color: 'bg-amber-100 text-amber-700' },
+  // Company focus list (Nov 2026) — the server sends the full list with counts;
+  // this is only the fallback when that request fails
+  { value: 'Reclamation', label: 'Reclamation', color: 'bg-amber-100 text-amber-700' },
+  { value: 'Marine Structures', label: 'Marine Structures', color: 'bg-blue-100 text-blue-700' },
+  { value: 'Quay', label: 'Quay', color: 'bg-teal-100 text-teal-700' },
+  { value: 'Terminal', label: 'Terminal', color: 'bg-sky-100 text-sky-700' },
+  { value: 'Offshore', label: 'Offshore', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'Piling & Foundations', label: 'Piling & Foundations', color: 'bg-slate-100 text-slate-700' },
+  { value: 'Desilting', label: 'Desilting', color: 'bg-amber-100 text-amber-700' },
+  { value: 'Intake & Outfall', label: 'Intake & Outfall', color: 'bg-cyan-100 text-cyan-700' },
+  { value: 'Pipeline', label: 'Pipeline', color: 'bg-slate-100 text-slate-700' },
+  { value: 'Tunnelling', label: 'Tunnelling', color: 'bg-stone-100 text-stone-700' },
+  { value: 'Trenching', label: 'Trenching', color: 'bg-stone-100 text-stone-700' },
+  { value: 'HDD', label: 'HDD (directional drilling)', color: 'bg-orange-100 text-orange-700' },
+  { value: 'Subsea Cable', label: 'Subsea Cable', color: 'bg-violet-100 text-violet-700' },
+  { value: 'Marine Survey', label: 'Marine Survey', color: 'bg-lime-100 text-lime-700' },
+  { value: 'MLD', label: 'MLD (water plants)', color: 'bg-blue-100 text-blue-700' },
   { value: 'Maritime', label: 'Maritime', color: 'bg-blue-100 text-blue-700' },
   { value: 'Dock', label: 'Dock', color: 'bg-slate-100 text-slate-700' },
   { value: 'Berth', label: 'Berth', color: 'bg-violet-100 text-violet-700' },
@@ -190,6 +208,8 @@ function TendersPageContent() {
   const [selectedCity, setSelectedCity] = useState(searchParams.get('city') || '');
   const [cityInput, setCityInput] = useState(searchParams.get('city') || '');
   const [liveInfo, setLiveInfo] = useState(null);
+  // How the server understood the search (topic or words + synonyms)
+  const [searchUnderstood, setSearchUnderstood] = useState(null);
   const [density, setDensity] = useState('compact');
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
@@ -239,6 +259,7 @@ function TendersPageContent() {
       setTenders(res.data.items);
       setLiveInfo(res.data.live_source ? { source: res.data.live_source, defaultSectors: res.data.default_sectors, syncedAt: res.data.synced_at, inactive: !!res.data.inactive, detail: res.data.detail } : null);
       setTotal(res.data.total);
+      setSearchUnderstood(res.data.search_understood || null);
       setTotalPages(res.data.total_pages);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load tenders';
@@ -543,6 +564,24 @@ function TendersPageContent() {
       {extractResult && (
         <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-2 text-sm text-blue-700">
           {extractResult}
+        </div>
+      )}
+
+      {/* How the search was understood: a whole topic from the keyword list, or
+          words (each with its synonyms / plurals) that must all appear */}
+      {filters.search && searchUnderstood && searchUnderstood.groups?.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-600">
+          <Search className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
+          <p className="min-w-0">
+            <span className="font-medium text-gray-900">Searching for “{filters.search}”</span>
+            {searchUnderstood.topic ? ' — any of: ' : ' — '}
+            {searchUnderstood.topic
+              ? searchUnderstood.groups[0].slice(0, 12).join(', ') + (searchUnderstood.groups[0].length > 12 ? ' …' : '')
+              : searchUnderstood.groups
+                  .map((g) => (g.length > 1 ? `(${g.slice(0, 4).join(' / ')})` : g[0]))
+                  .join(' + ')}
+            <span className="text-gray-400"> · in titles, work descriptions, buyers and places; bid numbers too</span>
+          </p>
         </div>
       )}
 

@@ -41,7 +41,8 @@ It:
 
 - **Collects tenders automatically** from government portals — mainly **GeM** (Government e-Marketplace, all-India bids), plus CPPP / eTenders, IREPS and individual port trust sites.
 - **Shows Europe's, the UK's and World Bank (worldwide) tenders live** — from **TED** (the EU's official tender journal), **Find a Tender** (the UK government's tender service) and the **World Bank** procurement notices — in the same Tenders tab, chosen through the Region filter, **never stored in the database**. French / Spanish / Portuguese notices are matched to the English categories (and translated when an OpenAI key with credit is set).
-- **Keeps only relevant tenders**, sorting each one into the team's **31 categories** (Port, Jetty, Dredging, Pipeline, Railway, Electrical, …).
+- **Keeps only relevant tenders**, sorting each one into the team's **45 categories / sectors** (Port, Jetty, Dredging, Reclamation, Tunnelling, HDD, Pipeline, Railway, Electrical, …).
+- **Smart search** — the header search understands the company's keyword list ("Shore/coastal protection", "HDD / horizontal directional drilling" …), synonyms, abbreviations and plurals (see §9).
 - **Shows dredging / marine / pipeline / shipping tenders first**.
 - **Stays live** — new GeM bids appear in the app within about 5 minutes, and open pages refresh by themselves.
 - Lets the team **shortlist**, comment, tag, assign and track tenders, see **upcoming deadlines**, read the **required documents and bid terms** parsed from the GeM bid PDF, get **alerts**, and generate **AI tender notes**.
@@ -238,6 +239,7 @@ MySQL-compatible (XAMPP locally, **TiDB Cloud** in production). Tables are creat
 | `note_templates`, `tender_notes` | AI tender-note templates and generated notes |
 | `audit_logs` | Who did what, when, from which IP. `entity_id` = database ID of the item acted on (a UUID for users / tenders / templates / keywords / sources / notes, `ted` / `fts` / `worldbank` for live sources, the user for sign-ins; `''` when there is none, e.g. Scrape all). For creations it is taken from the API's answer. Times to the second |
 | `user_sessions` | One row per sign-in (session id, user, created / last used / expires / revoked, IP, browser) — tokens carry the session id; logout / password change / deactivation revoke it. Never stores the token |
+| `app_migrations` | One-time data changes already done (id, time, note) — e.g. `company_keywords_2026_11` |
 | `users.user_code` | Readable unique user ID — `USR-0001`, `USR-0002` … in order of joining (unique index; given at sign-up / admin create, and to existing users at start-up). Shown on the Users page and in the Audit Log; `users.id` (UUID) stays the real key |
 | `users.signup_status` | `pending` / `approved` / `rejected` for self sign-ups (NULL = older accounts = approved) |
 | `live_source_settings` | On/off and refresh interval of the live sources (TED, Find a Tender, World Bank) — settings only, never tenders; created on start |
@@ -322,15 +324,29 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 
 ## 9. Categories and priority tenders
 
-**31 categories** (keyword rules in `services/category.service.js`, whole-word matching with plurals):
+**45 categories / sectors** (keyword rules in `services/category.service.js`, whole-word matching with plurals):
 
-Marine & dredging — Port, Jetty, Wharf, Breakwater, Harbour, Dredging, Maritime, Dock, Berth, Shipping, Cargo, Vessel, Tugboat, Navigation, Lighthouse, Coastal, Waterway, Shipbuilding, Ship Repair
+Marine & dredging — Port, Jetty, Wharf, **Quay**, Breakwater, Harbour, Dredging, Maritime, Dock, Berth, Shipping, Cargo, Vessel, Tugboat, Navigation, Lighthouse, Coastal (now also shore / coastal protection, sea walls, revetments, groynes), Waterway, Shipbuilding, Ship Repair
+**Company focus list (added Nov 2026)** — **Reclamation**, **Marine Structures**, **Terminal** (container / cargo / cruise / fishing …), **Offshore**, **Piling & Foundations** (piling, marine foundations, dolphins), **Desilting** (dam / reservoir desilting, sediment removal), **Intake & Outfall** (water / cooling-water intakes, outfalls), **Tunnelling** (tunnelling, TBM, road / rail / subsea tunnels — not tunnel coolers or ovens), **Trenching**, **HDD** (horizontal directional drilling, trenchless — the bare word "HDD" is not used because GeM computer bids say "HDD 1 TB"), **Subsea Cable** (subsea / submarine cables, duct banks), **Marine Survey** (hydrographic, bathymetric, marine geotechnical), **MLD** (million litres per day plants)
 Infrastructure — Road, Bridge, Railway, Construction, Electrical, **Pipeline**, Water/Plumbing, Maintenance
 Other — Security, IT/Software, Consultancy, Procurement
 
 **Priority tenders (shown first).** The team's focus is dredging, marine construction, pipelines, shipping and vessels. `services/priority.service.js` sets `tenders.is_priority` using **marine-specific phrases** on the title and name of work — e.g. dredging, jetty, wharf, harbour, breakwater, dry dock, port trust/authority, coastal protection, waterway, pipeline / pipe laying, ship repair, tug, barge, vessel, offshore, lighthouse. Loose words alone ("port", "channel", "cargo") don't count, and look-alikes are excluded (pressure vessel, marine plywood, railway berth, vessel sealing). The Tenders list and the Dashboard (recent tenders, upcoming deadlines) sort priority tenders first, then by the chosen order.
 
-The **Pipeline** category was added for pipeline / pipe-laying tenders (previously under Water/Plumbing); older tenders are tagged automatically on server start.
+The **Pipeline** category was added for pipeline / pipe-laying tenders (previously under Water/Plumbing). **Older tenders are tagged automatically on server start** with new or widened sectors (`backfillSectorTags` in `priority.service.js`: Pipeline, Port, Coastal and all focus-list sectors) — only missing tags are added, never removed.
+
+**Sector filter (Tenders page):** lists **every** sector with its count (0 when no tender has it yet) — `GET /tenders/facets`. Choosing a sector matches its keywords as **whole words** in the title, work name, scope and buyer (or a hand-added tag) — before, it matched any text containing the sector name, so "Port" also caught "support" / "transport" / "portable". The focus-list sectors are also **priority** (listed first).
+
+**Smart search** (`services/search.service.js`, header search bar → `/tenders?search=`):
+- **Topics:** each item of the company keyword list is understood as a whole — "Shore/coastal protection" searches shore protection, sea walls, revetments, groynes …; "Container/cargo/fishing/cruise terminals" any of those terminals; "Ports & port expansion", "Piling / marine foundations / dolphins", "HDD / horizontal directional drilling", "Marine geotechnical/hydrographic investigations" … Every sector name works the same way.
+- **Words:** otherwise every word must appear, in any order, each with its **synonyms / abbreviations / plurals** (HDD ⇄ horizontal directional drilling, TBM ⇄ tunnel boring machine, MLD ⇄ million litres per day, jetty ⇄ jetties, wharf ⇄ wharves, harbour ⇄ harbor, tunnel ⇄ tunnelling …). Known terms match as whole words ("port" ≠ "portable"); other words match the start of a word ("ultrason" → "ultrasonic").
+- **Other meanings left out:** "HDD" skips computer bids (TB / GB, SATA, SSD, servers, CCTV …) and "tunnel" skips tunnel coolers / ovens / dryers / wind tunnels — unless the wanted meaning is also clearly there.
+- Searches **title, work name, scope of work, buyer, issuing office, location and state**; **bid numbers** still match as typed.
+- The Tenders page shows how the search was understood ("Searching for … — any of: …"); the API returns it as `search_understood`.
+- Same matching on the **UK** and **World Bank** live lists (a search there looks through all open notices, not only the default marine sectors); Europe (TED) uses TED's own full-text search.
+- **Speed:** with a search or sector, the list first collects only the matching ids (one pass), sorts them, then loads the page — a rare word used to make the database walk every tender in date order (~6 s); now ~0.3–0.6 s locally.
+
+**Admin → Keywords** (used to auto-shortlist new tenders and for "keywords only" alerts): the company's focus keywords (dredging, reclamation, marine structures, shore / coastal protection, quay, terminals, offshore, piling, dolphins, desilting, intake / outfall / marine / subsea pipelines, tunnelling, TBM, trenching, HDD, subsea cables, duct banks, hydrographic / bathymetric surveys, MLD …) are **added once at server start** to every database (`ensureCompanyKeywords` in `keyword.service.js`, priority 1; ones already present are skipped; recorded in `app_migrations` so a deleted keyword doesn't come back). Keyword matching now uses the smart search (whole words, synonyms, other meanings left out), and **every keyword that isn't "exclude" counts** — keywords added on the Keywords page are saved as "scope" and were ignored by the old check.
 
 ---
 
@@ -544,6 +560,8 @@ Password rule (scripts and sign-up): at least 8 characters with a letter and a n
 | Signed out about 15–30 minutes after signing in | The quiet renewal (`/auth/refresh`) must succeed: the site sends `{}` as its body (a bare `null` is refused with 400). Check the browser's network tab for `/auth/refresh`. |
 | "Add keyword" fails with a server error | Older databases had no `keywords.priority` column. The API adds it at start-up (`account.service.js` → `ensureSchema`); restart the API once. |
 | Audit Log shows nothing for an action | Only successful changes are recorded, and reading pages isn't recorded. Entries made in the same second can appear in any order. |
+| A search finds nothing | The Tenders page shows how the search was understood. All words must appear (synonyms count); try fewer words or a list item ("Marine structures"). Bid numbers match as typed. |
+| A new sector shows (0) | No stored tender has that sector yet — counts grow as matching tenders are imported (older ones are tagged at server start). |
 | Template upload refused | Only real Word `.docx` files up to 10 MB are accepted (the message says which rule failed). |
 | "Too many failed sign-in attempts" | 5 wrong passwords for that email from your network — wait 15 minutes (or restart the API, which clears the counters). |
 | Viewer gets "Insufficient permissions" | Viewers are read-only — an admin can change the role in Admin → Users. |
@@ -600,6 +618,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 40. **Readable user IDs + named items in the Audit Log** — every user has a unique `USR-0001`-style ID (Users page, Audit Log, sign-in profile); Audit Log shows the name of the item acted on instead of a raw ID; creations now record the new item's ID.
 41. **New-account notifications to admins** — every new account (sign-up pending / auto-approved / created by an admin) sends an in-app alert to all admins; the Alerts page labels them and opens Admin → Users. Email alerts to follow later.
 42. **Responsive check of every page** — all pages checked at 5 screen sizes; fixed the admin tables whose Actions / columns were off-screen on phones, tablets and laptops (Sources, Users, Audit Log), the cramped role dropdown and the Settings reminder line.
+43. **Company keyword list: sectors, search and keywords** — 14 new sectors in the filter + widened Port / Coastal / Pipeline (whole-word sector matching, all sectors listed, older tenders tagged), smart search (keyword topics, synonyms, abbreviations, plurals, other meanings left out, all text fields, ~10× faster for rare words), same search on UK / World Bank, 35 company keywords added to Admin → Keywords once on every database, keyword matching fixed (whole words; "scope" keywords counted), focus-list sectors listed first.
+
 
 
 

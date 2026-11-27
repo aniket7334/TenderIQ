@@ -207,13 +207,15 @@ async function ready(waitMs = 25000) {
 function openNotices({ region, city, category, search } = {}) {
     const now = new Date().toISOString();
     const country = String(region || '').startsWith(COUNTRY_PREFIX) ? region.slice(COUNTRY_PREFIX.length) : null;
-    const q = (search || '').trim().toLowerCase();
+    const q = (search || '').trim();
+    const matches = require('../services/search.service').matcher(q);
     const cityQ = (city || '').trim().toLowerCase();
     return [...snapshot.values()].filter((c) => c.deadline >= now
         && (!country || c.country === country)
         && (!cityQ || String(c.city || '').toLowerCase().includes(cityQ))
-        && (category ? (category === 'Procurement' && c.group === 'Goods') || c.categories.includes(category) : c.is_priority)
-        && (!q || c.search_text.includes(q)));
+        // A search looks through every open notice; without one, the default marine sectors
+        && (category ? (category === 'Procurement' && c.group === 'Goods') || c.categories.includes(category) : (q ? true : c.is_priority))
+        && (!q || matches(c.search_text)));
 }
 
 function toTender(c) {

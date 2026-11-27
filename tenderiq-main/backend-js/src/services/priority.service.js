@@ -44,6 +44,18 @@ const PRIORITY_PATTERNS = [
     // Shipping & vessels
     'ship ?building', 'ship ?repairs?', 'ship ?yard', 'ships?', 'vessels?', 'tugs?', 'tug ?boats?',
     'barges?', 'dredgers?', 'boats?', 'pontoons?', 'lighthouses?', 'light houses?', 'cargo handling',
+    // Company focus list (Nov 2026): reclamation, terminals, piling, desilting, intake / outfall,
+    // tunnelling, trenching, HDD, subsea cables, marine surveys, MLD plants
+    '(land )?reclamation', 'reservoir (dredging|desilting)', 'sediment removal', 'desiltation',
+    '(container|cargo|cruise|passenger|ro-?ro|liquid|bulk|lng|oil|marine) terminals?',
+    'piling', 'pile foundations?', 'marine foundations?', 'sheet piles?', 'bored piles?', '(mooring |berthing )?dolphins?',
+    '(water|raw water|sea ?water|river|cooling[- ]water) intakes?', 'intake (wells?|structures?|pipe ?lines?|pump ?house|channel|jett(y|ies)|works?)', 'outfalls?', 'cooling[- ]water',
+    'tunnel(l)?ing', 'tbm', 'tunnel boring( machines?)?', 'micro ?tunnel(l)?ing', 'tunnel (construction|lining|excavation|works?)',
+    '(road|rail|railway|metro|subsea|undersea|marine|utility|cable|water) tunnels?',
+    'trenching', 'trench(es)?', 'hdd (crossings?|method|works?|drilling|technique|technology)', '(by|through) hdd', 'horizontal directional drilling', 'directional drilling', 'trenchless',
+    '(subsea|submarine|undersea|marine|offshore) cables?', 'duct banks?', 'cable landing',
+    'hydrographic( surveys?)?', 'bathymetr(y|ic)( surveys?)?', '(marine|offshore) geotechnical', 'geotechnical investigations?', 'seabed surveys?',
+    'mld', '[0-9]+ ?mld', 'million lit(re|er)s? per day',
 ];
 // Phrases that look marine but aren't
 const NOT_PRIORITY = ['pressure vessels?', 'vessel sealing', 'blood vessels?', 'without vessels?', 'storage vessels?', 'reaction vessels?', 'marine plywood', 'ship(ping|ment) charges?', 'shipping address'];
@@ -82,25 +94,37 @@ async function ensureSchema() {
     ready = true;
 }
 
-/** Older tenders were categorised before the Pipeline category existed. */
-async function backfillPipelineTags() {
-    const [rows] = await pool.query(
-        `SELECT t.id, t.title, t.name_of_work FROM tenders t
-          WHERE (t.title LIKE '%pipe%' OR t.name_of_work LIKE '%pipe%')
-            AND NOT EXISTS (SELECT 1 FROM tender_tags g WHERE g.tender_id = t.id AND g.tag_name = 'Pipeline')`
-    );
-    let added = 0;
+/**
+ * Sectors added or widened after tenders were imported: older tenders get these
+ * tags too, so the Sector filter counts and lists them. Only adds missing tags
+ * (never removes one); cheap when nothing is missing.
+ */
+const BACKFILL_SECTORS = [
+    'Pipeline', 'Port', 'Coastal', 'Quay', 'Reclamation', 'Marine Structures', 'Terminal', 'Offshore',
+    'Piling & Foundations', 'Desilting', 'Intake & Outfall', 'Tunnelling', 'Trenching', 'HDD',
+    'Subsea Cable', 'Marine Survey', 'MLD',
+];
+async function backfillSectorTags() {
+    const wanted = new Set(BACKFILL_SECTORS);
+    const [rows] = await pool.query('SELECT t.id, t.title, t.name_of_work, t.scope_of_work FROM tenders t');
+    const [tagRows] = await pool.query(
+        `SELECT tender_id, tag_name FROM tender_tags WHERE tag_name IN (${BACKFILL_SECTORS.map(() => '?').join(',')})`,
+        BACKFILL_SECTORS);
+    const have = new Set(tagRows.map((r) => `${r.tender_id}|${r.tag_name}`));
+    const toAdd = [];
     for (const r of rows) {
-        const cats = detectCategories([r.title, r.name_of_work].filter(Boolean).join(' '));
-        if (cats.some((c) => c.category === 'Pipeline')) {
-            await pool.execute(
-                'INSERT INTO tender_tags (id, tender_id, tag_name, created_at) VALUES (?, ?, ?, NOW())',
-                [uuidv4(), r.id, 'Pipeline']
-            );
-            added++;
+        const cats = detectCategories([r.title, r.name_of_work, r.scope_of_work].filter(Boolean).join(' '));
+        for (const c of cats) {
+            if (wanted.has(c.category) && !have.has(`${r.id}|${c.category}`)) toAdd.push([uuidv4(), r.id, c.category]);
         }
     }
-    return added;
+    for (let i = 0; i < toAdd.length; i += 500) {
+        const chunk = toAdd.slice(i, i + 500);
+        await pool.query(
+            `INSERT INTO tender_tags (id, tender_id, tag_name, created_at) VALUES ${chunk.map(() => '(?, ?, ?, NOW())').join(', ')}`,
+            chunk.flat());
+    }
+    return toAdd.length;
 }
 
 /**
@@ -145,10 +169,10 @@ async function refreshPriority({ ids, since } = {}) {
 async function initPriority() {
     try {
         await ensureSchema();
-        const tagged = await backfillPipelineTags();
+        const tagged = await backfillSectorTags();
         const changed = await refreshPriority();
         const [[{ c }]] = await pool.query('SELECT COUNT(*) AS c FROM tenders WHERE is_priority = 1');
-        console.log(`[Priority] ready — ${c} priority tenders (${changed} flags updated, ${tagged} older tenders tagged Pipeline)`);
+        console.log(`[Priority] ready — ${c} priority tenders (${changed} flags updated, ${tagged} sector tags added to older tenders)`);
     }
     catch (err) {
         console.error('[Priority] setup failed:', err.message);

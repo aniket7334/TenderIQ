@@ -42,6 +42,8 @@ async function ensureSchema() {
     // Keywords: the code saves a priority (1-5, default 3) but older databases have no
     // such column, which made every "Add keyword" fail. Added once; no-op afterwards.
     await ignoreExists('ALTER TABLE keywords ADD COLUMN priority INT NOT NULL DEFAULT 3');
+    // The company's focus keywords (Nov 2026 list) — added once, see keyword.service.js
+    await require('./keyword.service').ensureCompanyKeywords().catch((e) => console.error('[Keywords] company list not added:', e.message));
     // Readable unique user IDs (USR-0001, USR-0002 ...) — see assignUserCode below
     await ignoreExists('ALTER TABLE users ADD COLUMN user_code VARCHAR(16) NULL');
     await ignoreExists('CREATE UNIQUE INDEX uq_users_user_code ON users (user_code)');

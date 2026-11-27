@@ -134,9 +134,13 @@ async function listTenders(params) {
     const queryParams = [];
 
     if (params.search) {
-        conditions.push('(t.title LIKE ? OR t.name_of_work LIKE ? OR t.reference_no LIKE ?)');
-        const searchTerm = `%${params.search}%`;
-        queryParams.push(searchTerm, searchTerm, searchTerm);
+        // Smart search: company keyword topics, synonyms / abbreviations, plurals,
+        // all words in any order, across title, scope, buyer and location; bid numbers as typed
+        const cond = require('./search.service').sqlCondition(params.search);
+        if (cond) {
+            conditions.push(cond.sql);
+            queryParams.push(...cond.params);
+        }
     }
 
     const status = params.internal_status || params.status;
@@ -167,12 +171,24 @@ async function listTenders(params) {
     }
 
     if (params.category) {
-        const cat = params.category.toLowerCase();
-        conditions.push(
-            `(EXISTS (SELECT 1 FROM tender_tags tt2 WHERE tt2.tender_id = t.id AND tt2.tag_name = ?)
-              OR t.title LIKE ? OR t.name_of_work LIKE ? OR t.scope_of_work LIKE ? OR t.client_name LIKE ?)`
-        );
-        queryParams.push(params.category, `%${cat}%`, `%${cat}%`, `%${cat}%`, `%${cat}%`);
+        // Sector filter: any of the sector's keywords as a whole word (so "Port" no longer
+        // matches "support" / "transport"), or a tag added by hand
+        const body = require('./category.service').categoryRegexBody(params.category);
+        if (body) {
+            conditions.push(
+                `(EXISTS (SELECT 1 FROM tender_tags tt2 WHERE tt2.tender_id = t.id AND tt2.tag_name = ?)
+                  OR LOWER(CONCAT_WS(' ', t.title, t.name_of_work, t.scope_of_work, t.client_name)) REGEXP ?)`
+            );
+            queryParams.push(params.category, body);
+        }
+        else {
+            const cat = params.category.toLowerCase();
+            conditions.push(
+                `(EXISTS (SELECT 1 FROM tender_tags tt2 WHERE tt2.tender_id = t.id AND tt2.tag_name = ?)
+                  OR t.title LIKE ? OR t.name_of_work LIKE ? OR t.scope_of_work LIKE ? OR t.client_name LIKE ?)`
+            );
+            queryParams.push(params.category, `%${cat}%`, `%${cat}%`, `%${cat}%`, `%${cat}%`);
+        }
     }
 
     if (params.minValue !== undefined) {
@@ -212,10 +228,48 @@ async function listTenders(params) {
     const { isPriorityReady } = require('./priority.service');
     const priorityFirst = params.priorityFirst && isPriorityReady() ? 't.is_priority DESC, ' : '';
 
+    let total;
+    let items;
+    if (params.search || params.category) {
+        // Search / sector filter: these match few tenders, so walking the date index
+        // (the plan below) would read almost every row before finding 20 — ~6 s for a
+        // rare word. Instead: one pass for the matching ids and sort keys only, sort
+        // here, then load just this page's rows.
+        const [matches] = await pool.query(
+            `SELECT t.id, ${priorityFirst ? 't.is_priority' : '0'} AS prio, t.${sortField} AS sort_val FROM tenders t ${whereClause}`,
+            queryParams);
+        total = matches.length;
+        const dir = sortOrder === 'ASC' ? 1 : -1;
+        const key = (v) => (v == null ? null : v instanceof Date ? v.getTime() : typeof v === 'string' && v !== '' && !isNaN(Number(v)) ? Number(v) : v);
+        const cmp = (a, b) => {
+            // NULLs sort first ascending and last descending, as in MySQL
+            if (a === b) return 0;
+            if (a === null) return -1;
+            if (b === null) return 1;
+            if (typeof a === 'string' || typeof b === 'string') return String(a).localeCompare(String(b));
+            return a < b ? -1 : 1;
+        };
+        matches.sort((a, b) => (Number(b.prio) - Number(a.prio))
+            || dir * cmp(key(a.sort_val), key(b.sort_val))
+            || dir * String(a.id).localeCompare(String(b.id)));
+        const pageIds = matches.slice(offset, offset + parseInt(pageSize, 10)).map((m) => m.id);
+        items = [];
+        if (pageIds.length) {
+            const [rows] = await pool.query(
+                `SELECT t.*, ts.name as source_name, u.full_name as assignee_full_name
+                   FROM tenders t
+                   LEFT JOIN tender_sources ts ON t.source_id = ts.id
+                   LEFT JOIN users u ON t.assigned_to = u.id
+                  WHERE t.id IN (?)`, [pageIds]);
+            const byId = new Map(rows.map((r) => [r.id, r]));
+            items = pageIds.map((id) => byId.get(id)).filter(Boolean);
+        }
+    }
+    else {
     // Count query
     const countSql = `SELECT COUNT(*) as total FROM tenders t ${whereClause}`;
     const [countRows] = await pool.query(countSql, queryParams);
-    const total = countRows[0].total;
+    total = countRows[0].total;
 
     // Main query — "deferred join": sort and page through ids only, then load
     // full rows for just this page. Sorting whole rows (with long TEXT columns)
@@ -233,7 +287,8 @@ async function listTenders(params) {
         LEFT JOIN users u ON t.assigned_to = u.id
         ORDER BY ${priorityFirst}t.${sortField} ${sortOrder}, t.id ${sortOrder}
     `;
-    const [items] = await pool.query(dataSql, queryParams);
+    [items] = await pool.query(dataSql, queryParams);
+    }
 
     // Get tags for all fetched tenders
     let tagsMap = {};

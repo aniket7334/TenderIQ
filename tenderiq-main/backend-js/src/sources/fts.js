@@ -222,14 +222,16 @@ function matchesCategories(c, categories) {
 
 function openTenders({ region, city, category, search } = {}) {
     const now = new Date().toISOString();
-    const cats = category ? [category] : PRIORITY_GROUP;
-    const q = (search || '').trim().toLowerCase();
+    const q = (search || '').trim();
+    // A search looks through every open notice; without one, the default marine sectors
+    const cats = category ? [category] : q ? null : PRIORITY_GROUP;
+    const matches = require('../services/search.service').matcher(q);
     const cityQ = (city || '').trim().toLowerCase();
     return [...snapshot.values()].filter((c) => c.status === 'active' && c.deadline && c.deadline >= now
         && (region === UK || !region || c.nation === region)
         && (!cityQ || String(c.city || '').toLowerCase().includes(cityQ))
-        && matchesCategories(c, cats)
-        && (!q || c.search_text.includes(q)));
+        && (!cats || matchesCategories(c, cats))
+        && (!q || matches(c.search_text)));
 }
 
 function toTender(c) {

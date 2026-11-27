@@ -103,6 +103,8 @@ router.get('/', auth_1.authenticate, async (req, res) => {
             sortOrder: sort_order,
             priorityFirst: priority_first === '1' || priority_first === 'true',
         });
+        // What the search was understood as (shown on the Tenders page)
+        if (search) result.search_understood = require('../services/search.service').explain(search);
         res.json(result);
     }
     catch (err) {
@@ -148,8 +150,15 @@ router.get('/facets', auth_1.authenticate, async (_req, res) => {
               ORDER BY count DESC, tag_name ASC`
         );
         const [[india]] = await pool.execute('SELECT COUNT(*) AS count FROM tenders');
+        // Every sector is listed (0 when no tender has it yet), plus any hand-made tags
+        const counts = new Map(sectors.map((r) => [r.sector, Number(r.count)]));
+        const { CATEGORY_NAMES } = require('../services/category.service');
+        for (const name of CATEGORY_NAMES) if (!counts.has(name)) counts.set(name, 0);
+        const sectorList = [...counts.entries()]
+            .map(([sector, count]) => ({ sector, count }))
+            .sort((a, b) => b.count - a.count || a.sector.localeCompare(b.sector));
         res.json({
-            sectors: sectors.map((r) => ({ sector: r.sector, count: Number(r.count) })),
+            sectors: sectorList,
             regions: india.count ? [{ country: 'India', count: Number(india.count) }] : [],
             // Live count for "All Europe" (TED, not stored); null if TED didn't answer in time
             europe_total: await live.count('ted'),

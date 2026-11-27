@@ -161,12 +161,13 @@ async function testKeywords(text) {
   const matched_include = [];
   const matched_exclude = [];
 
+  // Same matching as filterTender (whole words, synonyms; any non-exclude keyword is include)
   for (const kw of rows) {
-    if (lowerText.includes(kw.keyword.toLowerCase())) {
-      if (kw.category === 'include') {
-        matched_include.push(kw.keyword);
-      } else if (kw.category === 'exclude') {
+    if (keywordMatches(kw.keyword, lowerText)) {
+      if (kw.category === 'exclude') {
         matched_exclude.push(kw.keyword);
+      } else {
+        matched_include.push(kw.keyword);
       }
     }
   }
@@ -180,6 +181,61 @@ async function testKeywords(text) {
  * filterTender - checks if a tender matches active keywords and should be shortlisted.
  * Returns true if include keywords match and no exclude keywords match.
  */
+const KEYWORD_MATCHERS = new Map();
+function keywordMatches(keyword, lowerText) {
+  const key = String(keyword || '').trim().toLowerCase();
+  if (!key) return false;
+  if (!KEYWORD_MATCHERS.has(key)) {
+    if (KEYWORD_MATCHERS.size > 2000) KEYWORD_MATCHERS.clear();
+    KEYWORD_MATCHERS.set(key, require('./search.service').matcher(key));
+  }
+  return KEYWORD_MATCHERS.get(key)(lowerText);
+}
+
+/*
+ * The company's focus keywords (list from Nov 2026), added once to Admin → Keywords
+ * on every database — local and live — at server start. Keywords already there
+ * (any spelling case) are skipped; an admin can delete any of them afterwards and
+ * it won't come back (the run is recorded in app_migrations).
+ */
+const COMPANY_KEYWORDS_ID = 'company_keywords_2026_11';
+const COMPANY_KEYWORDS = [
+  'dredging', 'reclamation', 'breakwater', 'marine structures', 'shore protection', 'coastal protection',
+  'berth', 'jetty', 'quay', 'wharf', 'port', 'port expansion',
+  'container terminal', 'cargo terminal', 'fishing harbour', 'cruise terminal',
+  'offshore', 'piling', 'marine foundation', 'dolphin',
+  'desilting', 'reservoir dredging', 'sediment removal',
+  'intake pipeline', 'outfall pipeline', 'marine pipeline', 'subsea pipeline', 'cooling water intake',
+  'tunnelling', 'subsea tunnel', 'tbm', 'trenching', 'cable trenching',
+  'hdd', 'horizontal directional drilling', 'subsea cable', 'duct bank',
+  'marine geotechnical', 'hydrographic survey', 'bathymetric survey', 'mld',
+];
+async function ensureCompanyKeywords() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS app_migrations (
+      id VARCHAR(64) NOT NULL PRIMARY KEY,
+      applied_at DATETIME NOT NULL,
+      note VARCHAR(255) NULL
+  )`);
+  const [[done]] = await pool.query('SELECT id FROM app_migrations WHERE id = ?', [COMPANY_KEYWORDS_ID]);
+  if (done) return { added: [], skipped: true };
+  const [rows] = await pool.query('SELECT LOWER(keyword) AS k FROM keywords');
+  const have = new Set(rows.map((r) => r.k.trim()));
+  const added = [];
+  for (const kw of COMPANY_KEYWORDS) {
+    if (have.has(kw)) continue;
+    const now = new Date();
+    await pool.query(
+      `INSERT INTO keywords (id, keyword, category, is_active, priority, created_by, created_at, updated_at)
+       VALUES (?, ?, 'include', 1, 1, NULL, ?, ?)`,
+      [uuidv4(), kw, now, now]);
+    added.push(kw);
+  }
+  await pool.query('INSERT INTO app_migrations (id, applied_at, note) VALUES (?, NOW(), ?)',
+    [COMPANY_KEYWORDS_ID, `added ${added.length} keyword(s)`.slice(0, 255)]);
+  console.log(`[Keywords] company keyword list: added ${added.length} (${added.join(', ') || 'none'})`);
+  return { added, skipped: false };
+}
+
 async function filterTender({ title, nameOfWork, scopeOfWork }) {
   const [rows] = await pool.query(
     'SELECT keyword, category FROM keywords WHERE is_active = ?',
@@ -193,12 +249,16 @@ async function filterTender({ title, nameOfWork, scopeOfWork }) {
   let includeMatch = false;
   let excludeMatch = false;
 
+  // Same matching as the search bar: whole words with plurals, synonyms and the
+  // company topics ("port" no longer matches "support"; "HDD" skips computer hard
+  // disks). Every keyword that isn't "exclude" counts as include — the Keywords
+  // page saves new ones as "scope", which the old check ignored.
   for (const kw of rows) {
-    if (text.includes(kw.keyword.toLowerCase())) {
-      if (kw.category === 'include') {
-        includeMatch = true;
-      } else if (kw.category === 'exclude') {
+    if (keywordMatches(kw.keyword, text)) {
+      if (kw.category === 'exclude') {
         excludeMatch = true;
+      } else {
+        includeMatch = true;
       }
     }
   }
@@ -215,4 +275,6 @@ module.exports = {
   deleteKeyword,
   testKeywords,
   filterTender,
+  ensureCompanyKeywords,
+  COMPANY_KEYWORDS,
 };
