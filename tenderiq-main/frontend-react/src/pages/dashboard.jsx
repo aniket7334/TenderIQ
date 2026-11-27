@@ -17,6 +17,8 @@ import toast from 'react-hot-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
+import { useRefreshAll } from '@/hooks/useRefreshAll';
+import { RefreshAllButton } from '@/components/ui/refresh-all-button';
 import { formatCurrency, formatDate, getStatusLabel } from '@/lib/utils';
 import { useLiveTenders } from '@/hooks/useLiveTenders';
 import { LiveStatus } from '@/components/ui/live-status';
@@ -123,6 +125,10 @@ export default function DashboardPage() {
     toast.success(`${count.toLocaleString()} new tender${count === 1 ? '' : 's'} added`, { id: 'live-new' });
   });
 
+  // Refresh (same as the Tenders page): admins fetch from every source and the numbers and
+  // lists reload as new tenders come in; others just reload the dashboard.
+  const refreshAll = useRefreshAll(() => fetchDashboard(true));
+
   const handleScrapeNow = async () => {
     try {
       setScraping(true);
@@ -196,10 +202,6 @@ export default function DashboardPage() {
           <LiveStatus sync={sync} className="mt-2" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => fetchDashboard(true)} variant="outline" size="md" title="Reload the numbers on this page (does not fetch new tenders)">
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
           {/* Fetching from the portals is admin-only (the server refuses it for other roles) */}
           {isAdmin && (
           <>
@@ -225,6 +227,7 @@ export default function DashboardPage() {
           </Button>
           </>
           )}
+          <RefreshAllButton {...refreshAll} />
         </div>
       </div>
 

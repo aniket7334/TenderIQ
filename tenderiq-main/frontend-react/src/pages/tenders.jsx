@@ -26,6 +26,8 @@ import { ALL_COUNTRIES, EUROPE, EUROPE_COUNTRY_NAMES, UK, UK_NATIONS, isUkRegion
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useLiveTenders } from '@/hooks/useLiveTenders';
+import { useRefreshAll } from '@/hooks/useRefreshAll';
+import { RefreshAllButton } from '@/components/ui/refresh-all-button';
 import { LiveStatus } from '@/components/ui/live-status';
 import useAuth, { canEditTenders } from '@/hooks/useAuth';
 
@@ -411,69 +413,9 @@ function TendersPageContent() {
     toast.success(`${count.toLocaleString()} new tender${count === 1 ? '' : 's'} added`, { id: 'live-new' });
   });
 
-  // Refresh button. Admins: fetch from every source (GeM, CPPP, eTenders, ports, state portals …)
-  // and follow the run, reloading the list as new tenders come in. Others can't start a scrape
-  // (the server refuses it), so for them it reloads the list.
-  const isAdmin = useAuth((s) => s.user)?.role === 'admin';
-  const [refreshRun, setRefreshRun] = useState(null); // { running, done, total, current, newTenders }
-  const refreshTimer = useRef(null);
-  const lastNew = useRef(0);
-  const followRefresh = useCallback(() => {
-    clearTimeout(refreshTimer.current);
-    const poll = async () => {
-      try {
-        const { data } = await api.get('/sources/scrape-all/status');
-        setRefreshRun(data);
-        if (data.newTenders > lastNew.current) {
-          lastNew.current = data.newTenders;
-          fetchTenders(true);
-          fetchFacets();
-        }
-        if (data.running) {
-          refreshTimer.current = setTimeout(poll, 5000);
-        } else {
-          fetchTenders(true);
-          fetchFacets();
-          toast.success(
-            data.newTenders
-              ? `All sources refreshed — ${data.newTenders.toLocaleString()} new tender${data.newTenders === 1 ? '' : 's'}`
-              : 'All sources refreshed — no new tenders',
-            { id: 'refresh-all' }
-          );
-          setRefreshRun(null);
-        }
-      } catch {
-        setRefreshRun(null);
-      }
-    };
-    poll();
-  }, [fetchTenders, fetchFacets]);
-  useEffect(() => () => clearTimeout(refreshTimer.current), []);
-  // Opened while a run is going (the hourly one, or one started elsewhere): show its progress
-  useEffect(() => {
-    if (!isAdmin) return;
-    api.get('/sources/scrape-all/status').then(({ data }) => {
-      if (data?.running) { lastNew.current = data.newTenders; followRefresh(); }
-    }).catch(() => {});
-  }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleRefresh = async () => {
-    fetchTenders(true);
-    fetchFacets();
-    if (!isAdmin || europeMode) {
-      toast.success('List refreshed', { id: 'refresh-all' });
-      return;
-    }
-    try {
-      await api.post('/sources/scrape-all');
-      lastNew.current = 0;
-      setRefreshRun({ running: true, done: 0, total: 0, newTenders: 0 });
-      toast('Fetching new tenders from all sources…', { id: 'refresh-all', icon: '🔄' });
-      followRefresh();
-    } catch {
-      // the API helper already reports errors
-    }
-  };
+  // Refresh button (shared with the Dashboard): admins fetch from every source and the list
+  // reloads as new tenders come in; others (and the live Europe / UK / World Bank views) just reload.
+  const refreshAll = useRefreshAll(() => { fetchTenders(true); fetchFacets(); }, { listOnly: europeMode });
 
   useEffect(() => {
     fetchSources();
@@ -655,27 +597,7 @@ function TendersPageContent() {
             <LiveStatus sync={sync} className="mt-1" />
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Button
-            variant="outline"
-            size="md"
-            onClick={handleRefresh}
-            disabled={!!refreshRun?.running}
-            title={isAdmin && !europeMode
-              ? 'Fetch new tenders from all sources (GeM, CPPP, eTenders, ports, state portals) and reload the list'
-              : 'Reload the list'}
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshRun?.running ? 'animate-spin' : ''}`} />
-            {refreshRun?.running ? 'Refreshing…' : 'Refresh'}
-          </Button>
-          {refreshRun?.running && (
-            <p className="max-w-[16rem] truncate text-right text-[11px] text-gray-500" aria-live="polite">
-              {refreshRun.total ? `${Math.min(refreshRun.done + 1, refreshRun.total)}/${refreshRun.total}` : 'Starting'}
-              {refreshRun.current ? ` · ${refreshRun.current}` : ''}
-              {refreshRun.newTenders ? ` · ${refreshRun.newTenders.toLocaleString()} new` : ''}
-            </p>
-          )}
-        </div>
+        <RefreshAllButton {...refreshAll} listOnly={europeMode} />
       </div>
 
       {/* Top control row: Advanced Filters | density | results | Export / Columns */}
