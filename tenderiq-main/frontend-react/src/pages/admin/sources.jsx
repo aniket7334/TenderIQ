@@ -341,21 +341,23 @@ export default function SourcesPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Name</th>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Name</th>
                     <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Adapter</th>
-                    <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Base URL</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Status</th>
-                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last Scraped</th>
-                    <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Success Rate</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Actions</th>
+                    {/* Columns appear only when the content area (screen minus the sidebar) has room */}
+                    <th className="hidden 2xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Base URL</th>
+                    <th className="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Status</th>
+                    <th className="hidden xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last Scraped</th>
+                    <th className="hidden 2xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Success Rate</th>
+                    {/* Pinned to the right edge: the buttons stay visible even if the table scrolls */}
+                    <th className="sticky right-0 bg-gray-50 px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {rows.map((source) => (
-                    <tr key={source.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-4 text-sm font-medium text-gray-900 sm:px-6 sm:whitespace-nowrap">
-                        <span className="line-clamp-2 sm:line-clamp-none">{source.name}</span>
+                    <tr key={source.id} className="group hover:bg-gray-50/50 transition-colors">
+                      <td className="min-w-[110px] px-3 py-4 text-sm font-medium text-gray-900 sm:min-w-[150px] sm:px-6">
+                        <span className="line-clamp-2">{source.name}</span>
                         {source.live && (
                           <span className="block text-xs font-normal text-gray-500">
                             {source.region_label} · live, not stored{source.open_tenders != null ? ` · ${source.open_tenders.toLocaleString()} open` : ''}
@@ -365,17 +367,17 @@ export default function SourcesPage() {
                       <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                         <Badge variant="info">{source.adapter_type?.toUpperCase() || 'N/A'}</Badge>
                       </td>
-                      <td className="hidden lg:table-cell max-w-xs truncate px-6 py-4 text-sm text-gray-600 font-mono">
+                      <td className="hidden 2xl:table-cell max-w-xs truncate px-6 py-4 text-sm text-gray-600 font-mono">
                         {source.base_url || '-'}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-4 sm:px-6">{getStatusBadge(source)}</td>
-                      <td className="hidden md:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                      <td className="whitespace-nowrap px-2 py-4 sm:px-6">{getStatusBadge(source)}</td>
+                      <td className="hidden xl:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                         {source.last_scraped_at ? formatDate(source.last_scraped_at) : 'Never'}
                       </td>
-                      <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                      <td className="hidden 2xl:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                         {source.success_rate != null ? `${Math.round(source.success_rate)}%` : '-'}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-4 text-right sm:px-6">
+                      <td className="sticky right-0 whitespace-nowrap bg-white px-2 py-4 text-right group-hover:bg-gray-50 sm:px-6">
                         {source.live ? (
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => openLiveEdit(source)} title="Edit" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">

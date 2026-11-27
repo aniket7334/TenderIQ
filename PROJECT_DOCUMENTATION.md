@@ -340,7 +340,7 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 - **Layout** (`components/layout/app-layout.jsx`): navy sidebar (Dashboard, Tenders, Shortlisted, Tender Notes, Alerts; **Admin section — shown to admins only**; Settings, Support), header search (× to clear, search button, Enter), alert bell with unread count, profile menu.
 - **API client** (`lib/api.js`): uses `VITE_API_URL` if set, otherwise the live Render API; adds the JWT; on 401 signs out.
 - **Design**: classic & simple — navy, white and warm grey; serif page titles (Source Serif); no gold accents; urgency shown with words ("Today", "2 days left") rather than red. Favicon: white briefcase on navy.
-- **Responsive**: mobile, tablet and desktop layouts (collapsible sidebar, stacked cards on phones).
+- **Responsive**: phone, tablet, laptop and desktop layouts — collapsible sidebar (menu button below 1024 px), stacked cards on phones, no sideways scrolling on any page (checked at 375, 768, 1024, 1280 and 1600 px). **Admin tables** (Sources, Users, Audit Log) show extra columns only when the content area beside the sidebar has room — Tailwind breakpoints count the whole screen, so with the 256 px sidebar a column marked `lg` would not fit; such columns use `xl` / `2xl`. Information from hidden columns moves elsewhere (Users: email, status and role under the name on phones; Audit Log: user under the time, entity type under the action, IP address in the row details). The **Actions** column is pinned to the right edge (`sticky right-0`), so its buttons are always visible.
 - **Money**: lists use `formatCurrency`; the Documents tab shows bid terms in **INR** exactly as in the bid.
 
 ---
@@ -599,6 +599,7 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 39. **Keyword fix** — "Add keyword" failed on databases without a `keywords.priority` column (the code saves a priority 1–5); the API now adds the column at start-up (default 3).
 40. **Readable user IDs + named items in the Audit Log** — every user has a unique `USR-0001`-style ID (Users page, Audit Log, sign-in profile); Audit Log shows the name of the item acted on instead of a raw ID; creations now record the new item's ID.
 41. **New-account notifications to admins** — every new account (sign-up pending / auto-approved / created by an admin) sends an in-app alert to all admins; the Alerts page labels them and opens Admin → Users. Email alerts to follow later.
+42. **Responsive check of every page** — all pages checked at 5 screen sizes; fixed the admin tables whose Actions / columns were off-screen on phones, tablets and laptops (Sources, Users, Audit Log), the cramped role dropdown and the Settings reminder line.
 
 
 

@@ -236,6 +236,8 @@ export default function SettingsPage() {
             >
               <div className={clsx('flex flex-wrap items-center gap-2', !settings.notify_deadlines && 'opacity-50')}>
                 <span className="text-xs text-gray-500">Remind me</span>
+                {/* Day buttons + "before" stay together when the line wraps on phones */}
+                <span className="flex items-center gap-2">
                 <div className="flex rounded-lg border border-gray-200 p-0.5 text-xs font-medium">
                   {[1, 3, 7].map((d) => (
                     <button
@@ -253,6 +255,7 @@ export default function SettingsPage() {
                   ))}
                 </div>
                 <span className="text-xs text-gray-500">before</span>
+                </span>
               </div>
             </SettingRow>
 

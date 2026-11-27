@@ -140,6 +140,30 @@ export default function UsersPage() {
   const pendingCount = users.filter((u) => u.signup_status === 'pending').length;
   const shown = view === 'pending' ? users.filter((u) => u.signup_status === 'pending') : users;
 
+  /* Role dropdown and status badge: shown in their own columns on wider screens,
+     and under the name on phones (see the table below) */
+  const roleSelect = (u) => (
+    <select
+      value={u.role}
+      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+      disabled={u.id === currentUser?.id}
+      aria-label={`Role of ${u.full_name}`}
+      className="rounded-lg border border-gray-300 bg-white py-1 pl-2 pr-7 text-xs font-medium focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {ROLES.map((r) => (
+        <option key={r.value} value={r.value}>{r.label}</option>
+      ))}
+    </select>
+  );
+  const statusBadge = (u) =>
+    u.signup_status === 'pending' ? (
+      <Badge variant="info">Pending approval</Badge>
+    ) : u.signup_status === 'rejected' ? (
+      <Badge variant="default">Rejected</Badge>
+    ) : (
+      <Badge variant={u.is_active ? 'success' : 'default'}>{u.is_active ? 'Active' : 'Inactive'}</Badge>
+    );
+
   const handleToggleActive = async (userId, isActive) => {
     try {
       await api.patch(`/admin/users/${userId}/role`, { is_active: !isActive });
@@ -286,19 +310,22 @@ export default function UsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">
+                <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Name</th>
-                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Role</th>
+                  {/* Columns appear only when the content area (screen minus the sidebar) has room;
+                      until then email / status / role show under the name */}
+                  <th className="hidden xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Email</th>
+                  <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Role</th>
                   <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                  <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Created</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Actions</th>
+                  <th className="hidden 2xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Created</th>
+                  {/* Pinned to the right edge: the buttons stay visible even if the table scrolls */}
+                  <th className="sticky right-0 bg-gray-50 px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {shown.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-4 sm:px-6 sm:whitespace-nowrap">
+                  <tr key={u.id} className="group hover:bg-gray-50/50 transition-colors">
+                    <td className="px-4 py-4 sm:px-6">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
                           {u.full_name?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
@@ -307,54 +334,40 @@ export default function UsersPage() {
                           <p className="truncate text-sm font-medium text-gray-900">{u.full_name}</p>
                           {/* Readable unique user ID — the same ID appears in the Audit Log */}
                           {u.user_code && <p className="font-mono text-xs text-gray-500">{u.user_code}</p>}
-                          <p className="truncate text-xs text-gray-500 md:hidden">{u.email}</p>
+                          <p className="break-all text-xs text-gray-500 xl:hidden">{u.email}</p>
+                          {/* Phones: status and role under the name */}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2 sm:hidden">
+                            {statusBadge(u)}
+                            {roleSelect(u)}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">{u.email}</td>
-                    <td className="whitespace-nowrap px-4 py-4 sm:px-6">
-                      <select
-                        value={u.role}
-                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                        disabled={u.id === currentUser?.id}
-                        className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs font-medium focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r.value} value={r.value}>{r.label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4">
-                      {u.signup_status === 'pending' ? (
-                        <Badge variant="info">Pending approval</Badge>
-                      ) : u.signup_status === 'rejected' ? (
-                        <Badge variant="default">Rejected</Badge>
-                      ) : (
-                        <Badge variant={u.is_active ? 'success' : 'default'}>
-                          {u.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                    <td className="hidden xl:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">{u.email}</td>
+                    <td className="hidden sm:table-cell whitespace-nowrap px-4 py-4 sm:px-6">{roleSelect(u)}</td>
+                    <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4">{statusBadge(u)}</td>
+                    <td className="hidden 2xl:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                       {formatDate(u.created_at)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-right sm:px-6">
+                    <td className="sticky right-0 whitespace-nowrap bg-white px-2 py-4 text-right group-hover:bg-gray-50 sm:px-6">
                       <div className="flex items-center justify-end gap-1">
                         {u.signup_status === 'pending' && (
                           <>
                             <button
                               onClick={() => handleApprove(u)}
                               title={`Approve as ${(ROLES.find((r) => r.value === u.role) || {}).label || 'Viewer'} (change the role first if needed)`}
-                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              aria-label="Approve"
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 xl:px-2.5"
                             >
-                              <Check className="h-3.5 w-3.5" /> Approve
+                              <Check className="h-3.5 w-3.5" /> <span className="hidden xl:inline">Approve</span>
                             </button>
                             <button
                               onClick={() => handleReject(u)}
                               title="Reject this sign-up"
-                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              aria-label="Reject"
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 xl:px-2.5"
                             >
-                              <UserX className="h-3.5 w-3.5" /> Reject
+                              <UserX className="h-3.5 w-3.5" /> <span className="hidden xl:inline">Reject</span>
                             </button>
                           </>
                         )}

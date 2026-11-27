@@ -340,11 +340,13 @@ export default function AuditLogPage() {
                   <tr className="border-b border-gray-100 bg-gray-50/50">
                     <th className="w-8 px-2 py-3 sm:px-3" />
                     <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Timestamp</th>
-                    <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
+                    {/* Columns appear only when the content area (screen minus the sidebar) has room;
+                        until then user shows under the time, entity type under the action, IP in the details */}
+                    <th className="hidden xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
                     <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">Action</th>
-                    <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Entity Type</th>
+                    <th className="hidden 2xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Entity Type</th>
                     <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Item</th>
-                    <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">IP Address</th>
+                    <th className="hidden 2xl:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">IP Address</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -368,11 +370,11 @@ export default function AuditLogPage() {
                         </td>
                         <td className="px-3 py-4 text-xs text-gray-600 sm:px-6 sm:whitespace-nowrap sm:text-sm">
                           {formatDate(log.created_at, 'dd MMM yyyy HH:mm:ss')}
-                          <div className="mt-1 text-xs text-gray-500 md:hidden">
+                          <div className="mt-1 text-xs text-gray-500 xl:hidden">
                             {log.user_name || 'System'}{log.user_code ? ` · ${log.user_code}` : ''}
                           </div>
                         </td>
-                        <td className="hidden md:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                        <td className="hidden xl:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                           {log.user_name || 'System'}
                           {/* Readable unique user ID (USR-0001 ...) — tells apart people with the same name */}
                           {log.user_code && (
@@ -381,12 +383,15 @@ export default function AuditLogPage() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 sm:px-6">
                           {getActionBadge(log.action)}
+                          <span className="mt-1 block text-xs text-gray-500 2xl:hidden">
+                            {(ENTITY_TYPE_OPTIONS.find((o) => o.value === log.entity_type) || {}).label || log.entity_type}
+                          </span>
                         </td>
-                        <td className="hidden sm:table-cell whitespace-nowrap px-6 py-4">
+                        <td className="hidden 2xl:table-cell whitespace-nowrap px-6 py-4">
                           <Badge variant="default">{(ENTITY_TYPE_OPTIONS.find((o) => o.value === log.entity_type) || {}).label || log.entity_type}</Badge>
                         </td>
                         {/* The item the action was done to, by name (full ID on hover and in the details) */}
-                        <td className="hidden md:table-cell max-w-[260px] px-6 py-4 text-sm text-gray-700" title={log.entity_id ? `ID: ${log.entity_id}` : undefined}>
+                        <td className="hidden md:table-cell max-w-[240px] px-6 py-4 text-sm text-gray-700" title={log.entity_id ? `ID: ${log.entity_id}` : undefined}>
                           {log.item_label || log.item_code ? (
                             <>
                               {log.item_code && <span className="block font-mono text-xs text-gray-500">{log.item_code}</span>}
@@ -396,7 +401,7 @@ export default function AuditLogPage() {
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
-                        <td className="hidden lg:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                        <td className="hidden 2xl:table-cell whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                           {log.ip_address || '-'}
                         </td>
                       </tr>
@@ -416,6 +421,8 @@ export default function AuditLogPage() {
                                 </dd>
                                 <dt className="font-semibold uppercase text-gray-400">Item ID</dt>
                                 <dd className="break-all font-mono text-gray-500">{log.entity_id || '—'}</dd>
+                                <dt className="font-semibold uppercase text-gray-400">IP address</dt>
+                                <dd className="font-mono text-gray-500">{log.ip_address || '—'}</dd>
                               </dl>
                               {log.changes && Object.keys(log.changes).length > 0 && (
                                 <>
