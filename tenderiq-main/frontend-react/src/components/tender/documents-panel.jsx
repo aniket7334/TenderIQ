@@ -41,6 +41,70 @@ const GROUPS = [
   { kind: 'upload', title: 'Uploaded by your team', hint: '' },
 ];
 
+/** "Where to view and apply" — one row per place this tender is published or taken bids on. */
+export function WhereToApply({ links }) {
+  const [copied, setCopied] = React.useState(null);
+  const copy = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(text);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* clipboard blocked: the ID is still visible to copy by hand */
+    }
+  };
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <header className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5">
+        <Globe className="h-[18px] w-[18px] text-gray-500" />
+        <h3 className="text-sm font-semibold text-gray-900">Where to view and apply</h3>
+        <span className="text-xs text-gray-500">· {links.length} {links.length === 1 ? 'place' : 'places'}</span>
+      </header>
+      <ul className="divide-y divide-gray-100">
+        {links.map((l, i) => (
+          <li key={i} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
+                <span
+                  className={clsx(
+                    'rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                    l.role === 'apply' ? 'bg-brand-700 text-white' : 'bg-gray-100 text-gray-600',
+                  )}
+                >
+                  {l.role === 'apply' ? 'Bid here' : 'View'}
+                </span>
+                {l.source}
+              </p>
+              {l.id && (
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                  <span className="font-mono">{l.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => copy(l.id)}
+                    className="rounded border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-50"
+                    title="Copy, to search for it on the portal"
+                  >
+                    {copied === l.id ? 'Copied' : 'Copy'}
+                  </button>
+                </p>
+              )}
+              {l.how && <p className="mt-1 text-xs text-gray-500">{l.how}</p>}
+            </div>
+            <a
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex flex-shrink-0 items-center gap-1.5 self-start rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 sm:self-center"
+            >
+              Open <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function hostOf(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, '');

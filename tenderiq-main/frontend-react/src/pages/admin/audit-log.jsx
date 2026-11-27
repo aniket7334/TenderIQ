@@ -70,6 +70,7 @@ const ACTION_LABELS = {
   update_note: 'Note edited',
   export_note: 'Note exported',
   update_alert_settings: 'Alert settings changed',
+  source_update: 'Updated from source',
 };
 const actionLabel = (action) => ACTION_LABELS[action] || action;
 // Security-relevant actions get the stronger badge

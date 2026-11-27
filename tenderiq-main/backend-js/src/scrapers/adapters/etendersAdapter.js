@@ -58,23 +58,41 @@ const dateNormalizer_1 = require("../normalizers/dateNormalizer");
  *  5: Organisation Chain
  */
 class EtendersAdapter extends baseAdapter_1.BaseAdapter {
+    portalHost = 'https://etenders.gov.in';
+    portalName = 'eTenders';
     async fetchListings(page = 1) {
+        // 20 tenders a page. Page 2+ is a link that only works in the session page 1 opened
+        // (its cookie), so it is followed only when the previous page showed a link to it.
+        if (page > 1 && !(this.sessionCookie && this.nextPage === page))
+            return [];
         try {
             const org = this.config?.org || '';
-            console.log(`[eTenders] Fetching page ${page} for org: "${org}"...`);
-            const response = await axios_1.default.get('https://etenders.gov.in/eprocure/app', {
-                params: {
-                    page: 'FrontEndLatestActiveTendersOrgwise',
-                    service: 'page',
-                    org: org,
-                },
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                },
-                timeout: 30000,
-            });
-            const $ = cheerio.load(response.data);
+            console.log(`[${this.portalName}] Fetching page ${page} for org: "${org}"...`);
+            const host = this.config?.host || this.portalHost;
+            const headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            };
+            const response = page === 1
+                ? await axios_1.default.get(`${host}/eprocure/app`, {
+                    params: { page: 'FrontEndLatestActiveTendersOrgwise', service: 'page', org },
+                    headers, timeout: 30000,
+                })
+                : await axios_1.default.get(`${host}/eprocure/app`, {
+                    params: {
+                        component: '$TablePages.linkPage', page: 'FrontEndLatestActiveTendersOrgwise', service: 'direct',
+                        session: 'T', sp: ['AFrontEndLatestActiveTendersOrgwise,table', String(page)],
+                    },
+                    paramsSerializer: { indexes: null },
+                    headers: { ...headers, Cookie: this.sessionCookie }, timeout: 30000,
+                });
+            if (page === 1) {
+                const set = response.headers['set-cookie'];
+                this.sessionCookie = set ? (Array.isArray(set) ? set : [set]).map((c) => c.split(';')[0]).join('; ') : '';
+            }
+            const html = String(response.data);
+            this.nextPage = new RegExp(`TablePages\\.linkPage[^"']*sp=${page + 1}["'&]`).test(html) ? page + 1 : null;
+            const $ = cheerio.load(html);
             const tenders = [];
             $('table tr').each((i, el) => {
                 if ($(el).find('th').length > 0)
@@ -97,7 +115,9 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
                 if (lowerTitle.includes('designed, developed') || lowerTitle.includes('national informatics') ||
                     lowerTitle.includes('tender opening date') || lowerTitle.includes('mis reports') ||
                     lowerTitle.includes('version :') || lowerTitle.includes('screen resolution') ||
-                    lowerTitle.includes('all rights reserved') || lowerTitle.includes('latest tender documents issued'))
+                    lowerTitle.includes('all rights reserved') || lowerTitle.includes('latest tender documents issued') ||
+                    // the table's own header row, written with <td> instead of <th>
+                    lowerTitle.startsWith('title and ref') || /^e-?published date$/i.test(publishedDateStr))
                     return;
                 // Parse dates
                 const issueDate = (0, dateNormalizer_1.parseDate)(publishedDateStr) || undefined;
@@ -106,11 +126,17 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
                 // Build source URL
                 let sourceUrl;
                 if (link) {
-                    sourceUrl = link.startsWith('http') ? link : `https://etenders.gov.in${link}`;
+                    sourceUrl = link.startsWith('http') ? link : `${host}${link}`;
                 }
                 // Extract organization name from chain (last part after ||)
                 const orgParts = orgChain.split('||').map((s) => s.trim()).filter(Boolean);
-                const orgName = orgParts[orgParts.length - 1] || org;
+                // "Jawaharlal Nehru Port Trust||PP and D-JNPT": the buyer is the organisation, the office is the last part
+                const orgName = orgParts[0] || org;
+                const officeName = orgParts.length > 1 ? `${orgParts[orgParts.length - 1]}, ${orgName}` : orgName;
+                // An umbrella organisation (CPPP's "Ministry of Shipping" holds Paradip Port, DCI and
+                // Kamarajar Port): config.buyers names the real buyer by its office —
+                // [{ match: 'PPT', buyer: 'Paradip Port Authority', location: 'Paradip', state: 'Odisha' }]
+                const unit = (this.config?.buyers || []).find((b) => new RegExp(b.match, 'i').test(officeName));
                 // Try to extract estimated cost from extra columns (some eTenders pages have 7+ cols)
                 let estimatedProjectCost = null;
                 for (let ci = 5; ci < cells.length; ci++) {
@@ -130,21 +156,28 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
                     }
                 }
 
+                // The cell reads "[work title] [office ref no][2026_JNPT_935034_1]": split it so the
+                // title is just the work and the reference is the portal's Tender ID.
+                const parts = [...titleText.matchAll(/\[([^\]]*)\]/g)].map((m) => m[1].replace(/\s+/g, ' ').trim()).filter(Boolean);
+                const tenderId = parts.length && /^\d{4}_[A-Z0-9]+_\d+_\d+$/i.test(parts[parts.length - 1]) ? parts[parts.length - 1] : null;
+                const cleanTitle = tenderId && parts.length >= 2 ? parts[0] : titleText.replace(/\s+/g, ' ');
+                const officeRef = tenderId && parts.length >= 3 ? parts.slice(1, -1).join(' ') : null;
                 tenders.push({
-                    title: titleText,
-                    referenceNo: titleText.substring(0, 100),
-                    clientName: orgName,
-                    issuedBy: orgName,
+                    title: cleanTitle,
+                    referenceNo: tenderId || titleText.substring(0, 100),
+                    alsoKnownAs: officeRef ? [officeRef] : undefined,
+                    clientName: unit ? unit.buyer : orgName,
+                    issuedBy: unit ? orgParts[orgParts.length - 1] : officeName,
                     issueDate,
                     submissionEndDate,
                     openingDate,
                     sourceUrl,
                     estimatedProjectCost,
-                    location: this.config?.location || undefined,
-                    state: this.config?.state || undefined,
+                    location: (unit ? unit.location : this.config?.location) || undefined,
+                    state: (unit ? unit.state : this.config?.state) || undefined,
                 });
             });
-            console.log(`[eTenders] Found ${tenders.length} tenders for "${org}" on page ${page}`);
+            console.log(`[${this.portalName}] Found ${tenders.length} tenders for "${org}" on page ${page}`);
             return tenders;
         }
         catch (err) {
@@ -195,4 +228,13 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
     }
 }
 exports.EtendersAdapter = EtendersAdapter;
+/**
+ * The same organisation-wise listing on CPPP (eprocure.gov.in) — same NIC software, other host.
+ * Most major ports (JNPA, Kolkata, New Mangalore, Chennai, Mormugao …) publish there.
+ */
+class CpppOrgAdapter extends EtendersAdapter {
+    portalHost = 'https://eprocure.gov.in';
+    portalName = 'CPPP org';
+}
+exports.CpppOrgAdapter = CpppOrgAdapter;
 //# sourceMappingURL=etendersAdapter.js.map

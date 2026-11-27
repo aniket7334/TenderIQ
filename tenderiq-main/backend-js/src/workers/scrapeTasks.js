@@ -11,6 +11,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getAdapter } = require("../scrapers/adapters");
 const { filterTender } = require("../services/keyword.service");
 const { detectCategories } = require("../services/category.service");
+const crossSource = require("../services/crossSource.service");
 
 /**
  * Extract estimated cost from text using Indian currency patterns
@@ -100,6 +101,9 @@ async function scrapeSource(sourceId, opts = {}) {
     let tendersFound = 0;
     let tendersNew = 0;
     let tendersSkipped = 0;
+    // Same tender seen on this source and already stored from another; stored tenders updated
+    let tendersMerged = 0;
+    let tendersUpdated = 0;
     let timedOut = false;
     try {
         const adapterConfig = typeof source.config === 'string' ? JSON.parse(source.config) : source.config;
@@ -137,19 +141,26 @@ async function scrapeSource(sourceId, opts = {}) {
             const pageIsOld = !!cutoff && dated.length > 0 && dated.every((l) => new Date(l.issueDate).getTime() - skew < cutoff.getTime());
 
             for (const listing of listings) {
-                // Deduplicate by reference_no + source
-                if (listing.referenceNo) {
-                    const [existing] = await pool.execute(
-                        'SELECT id FROM tenders WHERE reference_no = ? AND source_id = ? LIMIT 1',
-                        [listing.referenceNo, source.id]
-                    );
-                    if (existing.length) continue;
-                }
-                // Same tender already stored under another number (e.g. a port's tender that is
-                // a GeM bid the GeM sync already saved): don't show it twice
-                if (Array.isArray(listing.alsoKnownAs) && listing.alsoKnownAs.length) {
-                    const [dup] = await pool.query('SELECT id FROM tenders WHERE reference_no IN (?) LIMIT 1', [listing.alsoKnownAs]);
-                    if (dup.length) { tendersSkipped++; continue; }
+                // Already stored? Same source's own number, an official ID shared with a stored
+                // tender (GeM bid number, CPPP Tender ID), or — on another source — the same work,
+                // buyer and closing day. Then: ONE entry, note where else it is published, and
+                // bring it up to date (later closing date, missing facts, extra documents).
+                const same = await crossSource.findSame(listing, source.id);
+                if (same) {
+                    const own = same.tender.source_id === source.id;
+                    let sameDetail = {};
+                    if (!own) {
+                        const firstTime = await crossSource.recordAlias(same.tender.id, source.id, listing);
+                        // This source's details once: its documents and IDs
+                        if (firstTime && (listing.detailUrl || listing.sourceUrl) && !adapter.skipDetail) {
+                            try { sameDetail = await adapter.fetchDetail(listing.detailUrl || listing.sourceUrl); }
+                            catch (e) { console.log(`  [Detail] Failed for "${listing.title?.substring(0, 50)}": ${e.message}`); }
+                        }
+                        tendersMerged++;
+                    }
+                    const changes = await crossSource.updateFromSource(same.tender, listing, sameDetail, { ownSource: own, sourceName: source.name });
+                    if (Object.keys(changes).length) tendersUpdated++;
+                    continue;
                 }
 
                 // Categorise up front: some sources (GeM) only keep tenders that
@@ -222,6 +233,9 @@ async function scrapeSource(sourceId, opts = {}) {
                     ]
                 );
 
+                // Its official IDs (GeM / CPPP numbers) — so other sources find it later
+                await crossSource.rememberIds(tenderId, crossSource.listingIds(listing, detail));
+
                 // Auto-tag with detected categories (listing + detail text)
                 const detailCategories = detectCategories([detail.nameOfWork, detail.scopeOfWork].filter(Boolean).join(' '));
                 const allCategories = [...categories, ...detailCategories.filter((d) => !categories.some((c) => c.category === d.category))];
@@ -260,7 +274,9 @@ async function scrapeSource(sourceId, opts = {}) {
             }
         }
         if (tendersSkipped)
-            console.log(`[Scrape] ${source.name}: skipped ${tendersSkipped} listings (outside our categories, or already stored under another number)`);
+            console.log(`[Scrape] ${source.name}: skipped ${tendersSkipped} listings that match none of our categories`);
+        if (tendersMerged || tendersUpdated)
+            console.log(`[Scrape] ${source.name}: ${tendersMerged} already stored from another source (linked), ${tendersUpdated} stored tender(s) updated`);
 
         // A run that read nothing at all didn't really work — record why
         const emptyRun = tendersFound === 0 && adapter.lastError;
@@ -367,6 +383,57 @@ const BUILT_IN_SOURCES = [
         priority: 8,
         config: { org: 'Mumbai Port Authority', location: 'Mumbai', state: 'Maharashtra' },
     },
+    {
+        migration: 'source_jnpa_cppp_2026_11',
+        name: 'JNPA (Jawaharlal Nehru Port)',
+        base_url: 'https://eprocure.gov.in',
+        adapter_type: 'cppp_org',
+        scrape_interval_minutes: 60,
+        priority: 8,
+        config: { org: 'Jawaharlal Nehru Port Trust', location: 'Navi Mumbai', state: 'Maharashtra' },
+    },
+    // Ports and maritime bodies that publish organisation-wise on CPPP (eprocure.gov.in) / eTenders.
+    // `org` is the name exactly as the portal's "Tenders by Organisation" page lists it.
+    // No location → the city comes from the tender's own words (national bodies work everywhere).
+    ...[
+        ['kolkata', 'Syama Prasad Mookerjee Port (Kolkata / Haldia)', 'cppp_org', 'Kolkata Port Trust', 'Kolkata', 'West Bengal'],
+        ['new_mangalore', 'New Mangalore Port', 'cppp_org', 'New Mangalore Port Trust', 'Mangaluru', 'Karnataka'],
+        ['chennai', 'Chennai Port', 'cppp_org', 'Chennai Port Trust', 'Chennai', 'Tamil Nadu'],
+        ['mormugao', 'Mormugao Port', 'cppp_org', 'Mormugao Port Authority', 'Mormugao', 'Goa'],
+        ['mumbai_cppp', 'Mumbai Port (CPPP)', 'cppp_org', 'Mumbai Port Trust', 'Mumbai', 'Maharashtra'],
+        ['iwai', 'IWAI (Inland Waterways Authority)', 'cppp_org', 'Inland Waterways Authority of India,MoS', null, null],
+        ['ipa', 'Indian Ports Association', 'cppp_org', 'Indian Ports Association', null, null],
+        ['alhw', 'Andaman Lakshadweep Harbour Works', 'cppp_org', 'Andaman Lakshadweep Harbour Works', 'Port Blair', 'Andaman and Nicobar Islands'],
+        ['dgll', 'DG Lighthouses and Lightships', 'cppp_org', 'Directorate General of Lighthouses and Lightships', null, null],
+        ['dgs', 'DG Shipping', 'cppp_org', 'Directorate General of Shipping', null, null],
+        ['cochin_shipyard', 'Cochin Shipyard', 'etenders', 'Cochin Shipyard Limited', 'Kochi', 'Kerala'],
+    ].map(([key, name, adapter, org, location, state]) => ({
+        migration: `source_${key}_2026_11`,
+        name,
+        base_url: adapter === 'etenders' ? 'https://etenders.gov.in' : 'https://eprocure.gov.in',
+        adapter_type: adapter,
+        scrape_interval_minutes: 60,
+        priority: 7,
+        config: { org, ...(location ? { location } : {}), ...(state ? { state } : {}) },
+    })),
+    {
+        // CPPP lists Paradip Port, Dredging Corporation of India and Kamarajar (Ennore) Port under
+        // "Ministry of Shipping"; each tender is stored with its own buyer and place
+        migration: 'source_mos_2026_11',
+        name: 'Paradip Port, DCI and Kamarajar Port (CPPP)',
+        base_url: 'https://eprocure.gov.in',
+        adapter_type: 'cppp_org',
+        scrape_interval_minutes: 60,
+        priority: 7,
+        config: {
+            org: 'Ministry of Shipping',
+            buyers: [
+                { match: '\\bPPT\\b|Paradip', buyer: 'Paradip Port Authority', location: 'Paradip', state: 'Odisha' },
+                { match: 'Dredging Corporation', buyer: 'Dredging Corporation of India', location: 'Visakhapatnam', state: 'Andhra Pradesh' },
+                { match: 'Ennore|Kamarajar', buyer: 'Kamarajar Port Limited', location: 'Chennai', state: 'Tamil Nadu' },
+            ],
+        },
+    },
 ];
 async function ensureBuiltInSources() {
     await pool.query(`CREATE TABLE IF NOT EXISTS app_migrations (
@@ -378,7 +445,9 @@ async function ensureBuiltInSources() {
     for (const s of BUILT_IN_SOURCES) {
         const [[done]] = await pool.query('SELECT id FROM app_migrations WHERE id = ?', [s.migration]);
         if (done) continue;
-        const [[exists]] = await pool.query('SELECT id FROM tender_sources WHERE adapter_type = ? OR name = ? LIMIT 1', [s.adapter_type, s.name]);
+        // Same name, or the same reader already set up for the same organisation
+        const [[exists]] = await pool.query('SELECT id FROM tender_sources WHERE name = ? OR (adapter_type = ? AND config LIKE ?) LIMIT 1',
+            [s.name, s.adapter_type, `%${JSON.stringify(s.config.org).slice(1, -1)}%`]);
         if (!exists) {
             await pool.query(
                 `INSERT INTO tender_sources (id, name, base_url, adapter_type, is_active, scrape_interval_minutes, config, priority, created_at, updated_at)
@@ -389,6 +458,39 @@ async function ensureBuiltInSources() {
         await pool.query('INSERT INTO app_migrations (id, applied_at, note) VALUES (?, NOW(), ?)', [s.migration, exists ? 'already there' : 'source added']);
     }
     if (added.length) console.log(`[Sources] added: ${added.join(', ')}`);
+    await tidyPortalTenders();
     return added;
 }
 exports.ensureBuiltInSources = ensureBuiltInSources;
+/**
+ * One time: eTenders / CPPP organisation tenders read before the reader was fixed had
+ * "[work] [office ref][2026_VPT_297883_1]" as their title and the office (not the port) as buyer.
+ * Give them a clean title and the port as buyer, keeping the office in "issued by".
+ */
+async function tidyPortalTenders() {
+    const id = 'tidy_portal_tenders_2026_11';
+    const [[done]] = await pool.query('SELECT id FROM app_migrations WHERE id = ?', [id]);
+    if (done) return;
+    const [rows] = await pool.query(
+        `SELECT t.id, t.title, t.client_name, s.config FROM tenders t JOIN tender_sources s ON s.id = t.source_id
+         WHERE s.adapter_type IN ('etenders', 'cppp_org')`);
+    let fixed = 0;
+    for (const r of rows) {
+        let cfg = r.config;
+        if (typeof cfg === 'string') { try { cfg = JSON.parse(cfg); } catch { cfg = {}; } }
+        const org = (cfg && cfg.org) || null;
+        const parts = [...String(r.title || '').matchAll(/\[([^\]]*)\]/g)].map((m) => m[1].replace(/\s+/g, ' ').trim()).filter(Boolean);
+        const hasId = parts.length >= 2 && /^\d{4}_[A-Z0-9]+_\d+_\d+$/i.test(parts[parts.length - 1]);
+        const title = hasId ? parts[0] : null;
+        const ref = hasId ? parts[parts.length - 1] : null;
+        const moveBuyer = org && r.client_name && r.client_name !== org;
+        if (!title && !moveBuyer) continue;
+        await pool.query(
+            `UPDATE tenders SET title = COALESCE(?, title), reference_no = COALESCE(?, reference_no),
+                client_name = COALESCE(?, client_name), issued_by = COALESCE(?, issued_by) WHERE id = ?`,
+            [title, ref, moveBuyer ? org : null, moveBuyer ? `${r.client_name}, ${org}` : null, r.id]);
+        fixed++;
+    }
+    await pool.query('INSERT INTO app_migrations (id, applied_at, note) VALUES (?, NOW(), ?)', [id, `${fixed} tenders tidied`]);
+    if (fixed) console.log(`[Sources] tidied ${fixed} eTenders/CPPP tenders (clean titles, port as buyer)`);
+}

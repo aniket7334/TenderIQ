@@ -1219,6 +1219,11 @@ function TendersPageContent() {
                                 {tender.reference_number}
                               </p>
                             )}
+                            {tender.also_on?.length > 0 && (
+                              <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                                Also on {tender.also_on.map((a) => a.source_name).join(', ')}
+                              </p>
+                            )}
                             {tender.original_language && (
                               <p className="mt-0.5 truncate text-[11px] text-gray-500">
                                 {tender.original_title ? `Translated from ${tender.original_language}` : `${tender.original_language} notice`}
@@ -1363,6 +1368,13 @@ function TendersPageContent() {
                     {tender.is_live && tender.location && (
                       <p className="mt-0.5 truncate text-xs text-gray-500">{tender.location}</p>
                     )}
+                    {/* Where: "Mumbai, India" (city when known, else the country) */}
+                    {!tender.is_live && tender.country && (
+                      <p className="mt-0.5 truncate text-xs text-gray-500">
+                        <span aria-hidden className="mr-1">{COUNTRY_OPTIONS.find((c) => c.value === tender.country)?.flag || '📍'}</span>
+                        {tender.city ? `${tender.city}, ` : ''}{tender.country}
+                      </p>
+                    )}
                     {tender.original_language && (
                       <p className="mt-0.5 text-[11px] text-gray-500">
                         {tender.original_title ? `Translated from ${tender.original_language}` : `${tender.original_language} notice`}
@@ -1383,6 +1395,11 @@ function TendersPageContent() {
                       {tender.source_name && (
                         <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
                           {tender.source_name}
+                        </span>
+                      )}
+                      {tender.also_on?.length > 0 && (
+                        <span className="text-[10px] text-gray-500" title={tender.also_on.map((a) => `${a.source_name}${a.reference_no ? ` (${a.reference_no})` : ''}`).join(', ')}>
+                          Also on {tender.also_on.map((a) => a.source_name).join(', ')}
                         </span>
                       )}
                     </div>

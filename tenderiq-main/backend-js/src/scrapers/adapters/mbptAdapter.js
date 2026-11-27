@@ -90,7 +90,8 @@ class MbptAdapter extends BaseAdapter {
             const lead = number.split(/\s|\|/)[0];
             if (lead && title.toUpperCase().startsWith(lead.toUpperCase())) title = clean(title.slice(lead.length)).replace(/^[-–:,.\s]+/, '') || title;
             out.push({
-                referenceNo: number.slice(0, 250),
+                // A number cell without digits ("Budgetary Enquiry") isn't unique: use the site's own id
+                referenceNo: (/\d/.test(number) || !tid ? number : `MBPT-${tid}`).slice(0, 250),
                 title: title.slice(0, 1000),
                 nameOfWork: title.slice(0, 1000),
                 clientName: 'Mumbai Port Authority',

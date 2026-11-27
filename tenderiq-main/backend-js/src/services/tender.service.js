@@ -74,7 +74,9 @@ function serializeTender(tender, tags, source, assignee, comments, documents, no
         state: tender.state || null,
         // All tracked sources (GeM, CPPP, eTenders, IREPS) are Indian portals
         country: 'India',
-        city: null,
+        // "Mumbai, India": the source's stored city, else the first city named in the tender
+        // (GeM listings have no place; see place.service.js). null when none is known.
+        city: require('./place.service').cityForTender(tender),
         scope_of_work: tender.scope_of_work,
         financial_criteria: tender.financial_criteria,
         experience_criteria: tender.experience_criteria,
@@ -340,11 +342,15 @@ async function listTenders(params) {
         }
     }
 
+    // Where else each tender is published (same tender on several sources — one entry)
+    const alsoOn = await require('./crossSource.service').aliasesFor(items.map((i) => i.id)).catch(() => ({}));
     const serialized = items.map(tender => {
         const source = tender.source_name ? { name: tender.source_name } : null;
         const assignee = tender.assignee_full_name ? { full_name: tender.assignee_full_name } : null;
         const tags = tagsMap[tender.id] || [];
-        return serializeTender(tender, tags, source, assignee, null, null, noteCountMap[tender.id] || 0, docCountMap[tender.id] || 0);
+        const out = serializeTender(tender, tags, source, assignee, null, null, noteCountMap[tender.id] || 0, docCountMap[tender.id] || 0);
+        out.also_on = (alsoOn[tender.id] || []).map((a) => ({ source_name: a.source_name, reference_no: a.reference_no }));
+        return out;
     });
 
     return {
@@ -396,7 +402,16 @@ async function getTender(tenderId) {
     const source = tender.source_name ? { name: tender.source_name } : null;
     const assignee = tender.assignee_full_name ? { full_name: tender.assignee_full_name } : null;
 
-    return serializeTender(tender, tags, source, assignee, comments, documents);
+    const out = serializeTender(tender, tags, source, assignee, comments, documents);
+    // Where else this tender is published: [{ source_name, reference_no, source_url, closing_date, last_seen_at }]
+    out.also_on = ((await require('./crossSource.service').aliasesFor([tender.id]).catch(() => ({})))[tender.id]) || [];
+    // Every place to view or bid on it (same list as the Documents tab)
+    const [[src]] = await pool.query('SELECT adapter_type FROM tender_sources WHERE id = ?', [tender.source_id || null]);
+    out.links = await require('./crossSource.service').whereToApply({
+        id: tender.id, reference_no: tender.reference_no, source_url: tender.source_url,
+        source_name: tender.source_name, adapter_type: src?.adapter_type,
+    }).catch(() => []);
+    return out;
 }
 
 async function updateTender(tenderId, data) {

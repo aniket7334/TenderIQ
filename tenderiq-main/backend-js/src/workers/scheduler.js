@@ -21,6 +21,9 @@ function startScheduler() {
     // in Admin → Sources, each at its own interval (src/sources/index.js)
     require('../sources').init();
 
+    // One tender, several sources: official-ID index, "also published on" links, one-time clean-ups
+    require('../services/crossSource.service').ensureSchema().catch((e) => console.error('[Sources] cross-source setup failed:', e.message));
+
     // Sources TenderIQ adds itself (e.g. Mumbai Port Authority) — once per database
     require('./scrapeTasks').ensureBuiltInSources().catch((e) => console.error('[Sources] setup failed:', e.message));
 

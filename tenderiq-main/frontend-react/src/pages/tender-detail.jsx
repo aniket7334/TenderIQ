@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
-import DocumentsPanel from '@/components/tender/documents-panel';
+import DocumentsPanel, { WhereToApply } from '@/components/tender/documents-panel';
 import HowToApply from '@/components/tender/how-to-apply';
 import useAuth, { canEditTenders } from '@/hooks/useAuth';
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
@@ -199,8 +199,10 @@ export default function TenderDetailPage() {
       `${tender.description || tender.eligibility_criteria || '-'}`,
       ``,
       `--- Source ---`,
-      `Source: ${tender.source_name || '-'}`,
-      `Source URL: ${tender.source_url || '-'}`,
+      `Source: ${[tender.source_name, ...(tender.also_on || []).map((a) => a.source_name)].filter(Boolean).join(', ') || '-'}`,
+      ...(tender.links?.length
+        ? tender.links.map((l) => `${l.role === 'apply' ? 'Bid here' : 'View'}: ${l.source}${l.id ? ` (${l.id})` : ''} — ${l.url}`)
+        : [`Source URL: ${tender.source_url || '-'}`]),
       ``,
       `--- Tags ---`,
       `${tender.tags?.length ? tender.tags.join(', ') : 'None'}`,
@@ -440,7 +442,8 @@ export default function TenderDetailPage() {
     { label: 'Category', value: tender.category },
     { label: 'Sub-Category', value: tender.subcategory },
     { label: 'Tender Type', value: tender.tender_type },
-    { label: 'Location', value: [tender.city, tender.state, tender.location].filter(Boolean).join(', ') || null, icon: MapPin },
+    // City, state, country — each once ("Mumbai, Maharashtra, India")
+    { label: 'Location', value: [...new Map([tender.city, tender.state, tender.location, tender.country].filter(Boolean).map((v) => [String(v).trim().toLowerCase(), String(v).trim()])).values()].join(', ') || null, icon: MapPin },
     { label: 'Estimated Cost', value: '__EDITABLE_COST__', icon: IndianRupee },
     { label: 'EMD Amount', value: tender.emd_amount ? formatCurrency(tender.emd_amount, tender.currency || 'INR') : null },
     { label: 'Tender Fee', value: tender.tender_fee ? formatCurrency(tender.tender_fee, tender.currency || 'INR') : null },
@@ -450,8 +453,9 @@ export default function TenderDetailPage() {
     { label: 'Opening Date', value: formatDate(tender.opening_date) },
     { label: 'Closing Date', value: formatDate(tender.closing_date) },
     { label: 'Eligibility / Scope', value: tender.eligibility_criteria },
-    { label: 'Source', value: tender.source_name },
-    { label: 'Source URL', value: tender.source_url },
+    // The same tender can be published on several sources: name them all
+    { label: tender.also_on?.length ? 'Sources' : 'Source', value: [tender.source_name, ...(tender.also_on || []).map((a) => a.source_name)].filter(Boolean).join(', ') },
+    ...(tender.links?.length ? [] : [{ label: 'Source URL', value: tender.source_url }]),
     { label: 'Priority', value: tender.priority },
     { label: 'Description', value: tender.description },
   ];
@@ -499,6 +503,22 @@ export default function TenderDetailPage() {
           </div>
           <h1 className="mt-2 break-words text-xl font-bold text-gray-900 sm:text-2xl">{tender.title}</h1>
           <p className="mt-1 text-sm text-gray-500">{[tender.organization, isLive && tender.location].filter(Boolean).join(' · ')}</p>
+          {/* The same tender on other sources — kept as ONE entry, updated from all of them */}
+          {Array.isArray(tender.also_on) && tender.also_on.length > 0 && (
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+              <span className="font-medium text-gray-600">Also published on:</span>
+              {tender.also_on.map((a, i) => (
+                <span key={i} className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-gray-700">
+                  {a.source_url ? (
+                    <a href={a.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline">{a.source_name}</a>
+                  ) : (
+                    a.source_name
+                  )}
+                  {a.reference_no && <span className="font-mono text-[11px] text-gray-500">· {a.reference_no}</span>}
+                </span>
+              ))}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 xl:max-w-[52%] xl:flex-shrink-0 xl:justify-end">
           {!isLive && canEdit && (
@@ -689,6 +709,13 @@ export default function TenderDetailPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'overview' && !isLive && tender.links?.length > 0 && (
+            <div className="mt-4">
+              {/* Where to view and apply — same list as the Documents tab */}
+              <WhereToApply links={tender.links} />
             </div>
           )}
 

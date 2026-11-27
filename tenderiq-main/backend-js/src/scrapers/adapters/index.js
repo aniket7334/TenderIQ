@@ -14,6 +14,8 @@ registry.set('gem', gemAdapter_1.GemAdapter);
 registry.set('cppp', cpppAdapter_1.CpppAdapter);
 registry.set('ireps', irepsAdapter_1.IrepsAdapter);
 registry.set('etenders', etendersAdapter_1.EtendersAdapter);
+// One organisation's tenders on CPPP (eprocure.gov.in): JNPA, Kolkata, New Mangalore …
+registry.set('cppp_org', etendersAdapter_1.CpppOrgAdapter);
 // Mumbai Port Authority's own tender pages (mumbaiport.gov.in)
 registry.set('mbpt', MbptAdapter);
 function getAdapter(adapterType, baseUrl, config) {
