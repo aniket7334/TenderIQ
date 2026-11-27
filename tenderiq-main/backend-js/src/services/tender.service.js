@@ -229,16 +229,24 @@ async function listTenders(params) {
     const priorityFirst = params.priorityFirst && isPriorityReady() ? 't.is_priority DESC, ' : '';
 
     let total;
+    // With a search: how many results are still open (shown first)
+    let openTotal;
     let items;
     if (params.search || params.category) {
         // Search / sector filter: these match few tenders, so walking the date index
         // (the plan below) would read almost every row before finding 20 — ~6 s for a
         // rare word. Instead: one pass for the matching ids and sort keys only, sort
         // here, then load just this page's rows.
+        // A search shows OPEN tenders first (deadline still ahead), then the rest
+        // (closed, or no deadline given); within each group the usual order applies.
+        const openFirst = !!params.search;
         const [matches] = await pool.query(
-            `SELECT t.id, ${priorityFirst ? 't.is_priority' : '0'} AS prio, t.${sortField} AS sort_val FROM tenders t ${whereClause}`,
+            `SELECT t.id, ${priorityFirst ? 't.is_priority' : '0'} AS prio, t.${sortField} AS sort_val,
+                    ${openFirst ? "CASE WHEN t.submission_end_date >= NOW() THEN 1 ELSE 0 END" : '0'} AS is_open
+               FROM tenders t ${whereClause}`,
             queryParams);
         total = matches.length;
+        if (openFirst) openTotal = matches.filter((m) => Number(m.is_open) === 1).length;
         const dir = sortOrder === 'ASC' ? 1 : -1;
         const key = (v) => (v == null ? null : v instanceof Date ? v.getTime() : typeof v === 'string' && v !== '' && !isNaN(Number(v)) ? Number(v) : v);
         const cmp = (a, b) => {
@@ -249,7 +257,8 @@ async function listTenders(params) {
             if (typeof a === 'string' || typeof b === 'string') return String(a).localeCompare(String(b));
             return a < b ? -1 : 1;
         };
-        matches.sort((a, b) => (Number(b.prio) - Number(a.prio))
+        matches.sort((a, b) => (Number(b.is_open) - Number(a.is_open))
+            || (Number(b.prio) - Number(a.prio))
             || dir * cmp(key(a.sort_val), key(b.sort_val))
             || dir * String(a.id).localeCompare(String(b.id)));
         const pageIds = matches.slice(offset, offset + parseInt(pageSize, 10)).map((m) => m.id);
@@ -339,6 +348,7 @@ async function listTenders(params) {
     return {
         items: serialized,
         total,
+        ...(openTotal !== undefined && { open_total: openTotal }),
         page,
         page_size: pageSize,
         total_pages: Math.ceil(total / pageSize),

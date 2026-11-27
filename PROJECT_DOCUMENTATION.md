@@ -342,6 +342,7 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 - **Words:** otherwise every word must appear, in any order, each with its **synonyms / abbreviations / plurals** (HDD ⇄ horizontal directional drilling, TBM ⇄ tunnel boring machine, MLD ⇄ million litres per day, jetty ⇄ jetties, wharf ⇄ wharves, harbour ⇄ harbor, tunnel ⇄ tunnelling …). Known terms match as whole words ("port" ≠ "portable"); other words match the start of a word ("ultrason" → "ultrasonic").
 - **Other meanings left out:** "HDD" skips computer bids (TB / GB, SATA, SSD, servers, CCTV …) and "tunnel" skips tunnel coolers / ovens / dryers / wind tunnels — unless the wanted meaning is also clearly there.
 - Searches **title, work name, scope of work, buyer, issuing office, location and state**; **bid numbers** still match as typed.
+- **Open tenders first:** search results list tenders whose deadline is still ahead first, then closed ones (deadline passed, or none given); within each group the usual order (marine priority, then the chosen sort). The API returns `open_total`; the page says "N open listed first, then M closed", draws a **"Closed tenders — deadline passed"** divider where they start, shows "Closed <date>" instead of "Due", and the table's Status says CLOSED (not OPEN) for closed tenders nobody has worked on. The list without a search is unchanged.
 - The Tenders page shows how the search was understood ("Searching for … — any of: …"); the API returns it as `search_understood`.
 - Same matching on the **UK** and **World Bank** live lists (a search there looks through all open notices, not only the default marine sectors); Europe (TED) uses TED's own full-text search.
 - **Speed:** with a search or sector, the list first collects only the matching ids (one pass), sorts them, then loads the page — a rare word used to make the database walk every tender in date order (~6 s); now ~0.3–0.6 s locally.
@@ -619,6 +620,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 41. **New-account notifications to admins** — every new account (sign-up pending / auto-approved / created by an admin) sends an in-app alert to all admins; the Alerts page labels them and opens Admin → Users. Email alerts to follow later.
 42. **Responsive check of every page** — all pages checked at 5 screen sizes; fixed the admin tables whose Actions / columns were off-screen on phones, tablets and laptops (Sources, Users, Audit Log), the cramped role dropdown and the Settings reminder line.
 43. **Company keyword list: sectors, search and keywords** — 14 new sectors in the filter + widened Port / Coastal / Pipeline (whole-word sector matching, all sectors listed, older tenders tagged), smart search (keyword topics, synonyms, abbreviations, plurals, other meanings left out, all text fields, ~10× faster for rare words), same search on UK / World Bank, 35 company keywords added to Admin → Keywords once on every database, keyword matching fixed (whole words; "scope" keywords counted), focus-list sectors listed first.
+44. **Search: open tenders first** — search results show open tenders (deadline ahead) first, then closed ones, with a count, a divider, "Closed" labels and the right status in the table.
+
 
 
 

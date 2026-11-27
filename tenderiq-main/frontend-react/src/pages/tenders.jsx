@@ -177,6 +177,9 @@ const CATEGORY_OPTIONS = [
   { value: 'Procurement', label: 'Procurement', color: 'bg-emerald-100 text-emerald-700' },
 ];
 
+/** Deadline already passed? (No deadline = not shown as closed.) */
+const isClosedTender = (t) => !!t.submission_deadline && new Date(t.submission_deadline).getTime() < Date.now();
+
 function TendersPageContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -210,6 +213,8 @@ function TendersPageContent() {
   const [liveInfo, setLiveInfo] = useState(null);
   // How the server understood the search (topic or words + synonyms)
   const [searchUnderstood, setSearchUnderstood] = useState(null);
+  // With a search: how many results are still open (they are listed first)
+  const [openTotal, setOpenTotal] = useState(null);
   const [density, setDensity] = useState('compact');
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
@@ -260,6 +265,7 @@ function TendersPageContent() {
       setLiveInfo(res.data.live_source ? { source: res.data.live_source, defaultSectors: res.data.default_sectors, syncedAt: res.data.synced_at, inactive: !!res.data.inactive, detail: res.data.detail } : null);
       setTotal(res.data.total);
       setSearchUnderstood(res.data.search_understood || null);
+      setOpenTotal(typeof res.data.open_total === 'number' ? res.data.open_total : null);
       setTotalPages(res.data.total_pages);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load tenders';
@@ -452,6 +458,15 @@ function TendersPageContent() {
   ].filter(Boolean).length;
 
   const fromIdx = total ? (filters.page - 1) * filters.page_size + 1 : 0;
+  // Divider before the first closed tender (search results list open ones first)
+  const firstClosedIdx = (() => {
+    if (!filters.search || openTotal === null || openTotal >= total) return -1;
+    const i = tenders.findIndex(isClosedTender);
+    if (i < 0) return -1;
+    // On a later page the closed group may start at the very first row
+    return i > 0 || fromIdx - 1 === openTotal ? i : -1;
+  })();
+  const closedDividerText = `Closed tenders — deadline passed (${(total - (openTotal || 0)).toLocaleString()})`;
   const toIdx = Math.min(filters.page * filters.page_size, total);
 
   // Density-driven row padding
@@ -581,6 +596,12 @@ function TendersPageContent() {
                   .map((g) => (g.length > 1 ? `(${g.slice(0, 4).join(' / ')})` : g[0]))
                   .join(' + ')}
             <span className="text-gray-400"> · in titles, work descriptions, buyers and places; bid numbers too</span>
+            {openTotal !== null && (
+              <span className="mt-1 block text-gray-700">
+                <span className="font-medium text-gray-900">{openTotal.toLocaleString()} open</span> listed first
+                {total - openTotal > 0 && <>, then {(total - openTotal).toLocaleString()} closed</>}
+              </span>
+            )}
           </p>
         </div>
       )}
@@ -1063,13 +1084,24 @@ function TendersPageContent() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {tenders.map((tender) => {
+                  {tenders.map((tender, idx) => {
+                    const rawStatus = String(tender.internal_status || tender.status || 'new').toLowerCase();
                     const badge = tender.is_live
                       ? { label: 'Live', cls: 'bg-gray-50 text-gray-600 ring-gray-200' }
-                      : statusBadge(tender.internal_status || tender.status);
+                      // Deadline passed and nobody worked on it: "CLOSED", not "OPEN"
+                      : isClosedTender(tender) && ['new', 'open', 'scraped', 'live'].includes(rawStatus)
+                        ? { label: 'CLOSED', cls: 'bg-gray-100 text-gray-600 ring-gray-500/20' }
+                        : statusBadge(rawStatus);
                     return (
+                      <React.Fragment key={tender.id}>
+                      {idx === firstClosedIdx && (
+                        <tr>
+                          <td colSpan={10} className="bg-gray-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                            {closedDividerText}
+                          </td>
+                        </tr>
+                      )}
                       <tr
-                        key={tender.id}
                         className="group transition-colors hover:bg-gray-50/70"
                       >
                         <td className={`px-4 ${rowPad}`} onClick={(e) => e.stopPropagation()}>
@@ -1138,6 +1170,9 @@ function TendersPageContent() {
                         </td>
                         <td className={`px-4 ${rowPad} text-sm text-gray-700`}>
                           {formatDate(tender.submission_deadline)}
+                          {isClosedTender(tender) && (
+                            <span className="mt-0.5 block text-[11px] font-medium text-gray-500">Closed</span>
+                          )}
                         </td>
                         <td className={`px-4 ${rowPad} text-right font-mono text-sm text-gray-900`}>
                           {tender.estimated_value
@@ -1186,6 +1221,7 @@ function TendersPageContent() {
                           </div>
                         </td>
                       </tr>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -1194,11 +1230,16 @@ function TendersPageContent() {
 
             {/* Mobile + tablet: stacked cards (below lg) */}
             <ul className="xl:hidden divide-y divide-gray-100">
-              {tenders.map((tender) => {
+              {tenders.map((tender, idx) => {
                 const cats = (tender.categories || [tender.category]).filter(Boolean).slice(0, 2);
                 return (
+                  <React.Fragment key={tender.id}>
+                  {idx === firstClosedIdx && (
+                    <li className="bg-gray-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                      {closedDividerText}
+                    </li>
+                  )}
                   <li
-                    key={tender.id}
                     className="px-4 py-3 active:bg-blue-50/40 transition-colors"
                     onClick={() => navigate(`/tenders/${tender.id}`)}
                   >
@@ -1230,7 +1271,13 @@ function TendersPageContent() {
                       {tender.estimated_value && (
                         <span className="font-medium text-gray-700">{formatCurrency(tender.estimated_value, tender.currency || tender.estimated_cost_currency || 'INR')}</span>
                       )}
-                      <span>Due {formatDate(tender.submission_deadline)}</span>
+                      {isClosedTender(tender) ? (
+                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
+                          Closed {formatDate(tender.submission_deadline)}
+                        </span>
+                      ) : (
+                        <span>Due {formatDate(tender.submission_deadline)}</span>
+                      )}
                       {tender.source_name && (
                         <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
                           {tender.source_name}
@@ -1276,6 +1323,7 @@ function TendersPageContent() {
                       </button>
                     </div>
                   </li>
+                  </React.Fragment>
                 );
               })}
             </ul>
