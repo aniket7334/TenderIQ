@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -38,7 +38,28 @@ import { formatCurrency, formatDate, getStatusColor, getStatusLabel } from '@/li
 export default function TenderDetailPage() {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const id = params.id;
+
+  /* ---- Back to the list the user came from (same search, filters, page, scroll) ---- */
+  const arrivedFromList = !!location.state?.fromList;
+  const fromList = (() => {
+    if (location.state?.fromList) return location.state.fromList;
+    try { return sessionStorage.getItem(`tenderiq:fromList:${id}`); } catch { return null; }
+  })();
+  const fromSearch = fromList ? new URLSearchParams(fromList.split('?')[1] || '').get('search') : null;
+  const backLabel = fromSearch ? `Back to results for “${fromSearch}”` : fromList ? 'Back to results' : 'Back to Tenders';
+  const goBack = () => {
+    // Opened straight from the list: step back in history (the list restores its scroll)
+    if (arrivedFromList && window.history.length > 1) navigate(-1);
+    else if (fromList) navigate(fromList, { state: { backToList: true } });
+    else navigate('/tenders');
+  };
+  // A tender opens at the top (the page area keeps the list's scroll otherwise)
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (main) main.scrollTop = 0;
+  }, [id]);
 
   const [tender, setTender] = useState(null);
   const [documents, setDocuments] = useState([]);
@@ -353,9 +374,9 @@ export default function TenderDetailPage() {
         <p className="text-lg font-medium text-gray-900">Tender not found</p>
         <p className="text-sm text-gray-500">{error}</p>
         <div className="flex gap-2">
-          <Button onClick={() => navigate('/tenders')} variant="outline" size="sm">
+          <Button onClick={goBack} variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4" />
-            Back to Tenders
+            {backLabel}
           </Button>
           <Button onClick={fetchTender} variant="outline" size="sm">
             <RefreshCw className="h-4 w-4" />
@@ -439,9 +460,9 @@ export default function TenderDetailPage() {
   return (
     <div className="space-y-6">
       {/* Back button */}
-      <Button onClick={() => navigate('/tenders')} variant="ghost" size="sm">
-        <ArrowLeft className="h-4 w-4" />
-        Back to Tenders
+      <Button onClick={goBack} variant="ghost" size="sm" className="max-w-full">
+        <ArrowLeft className="h-4 w-4 flex-shrink-0" />
+        <span className="truncate">{backLabel}</span>
       </Button>
 
       {/* Header */}

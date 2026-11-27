@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom';
 import {
   ChevronUp,
   ChevronDown,
@@ -192,7 +192,9 @@ const isClosedTender = (t) => !!t.submission_deadline && new Date(t.submission_d
 
 function TendersPageContent() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigationType = useNavigationType();
   const [tenders, setTenders] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -233,6 +235,8 @@ function TendersPageContent() {
     state: searchParams.get('state') || '',
     date_from: searchParams.get('date_from') || '',
     date_to: searchParams.get('date_to') || '',
+    min_value: searchParams.get('min_value') || undefined,
+    max_value: searchParams.get('max_value') || undefined,
     page: Number(searchParams.get('page')) || 1,
     page_size: 20,
     sort_by: searchParams.get('sort_by') || 'created_at',
@@ -245,6 +249,72 @@ function TendersPageContent() {
   useEffect(() => {
     setFilters((prev) => (prev.search === urlSearch ? prev : { ...prev, search: urlSearch, page: 1 }));
   }, [urlSearch]);
+
+  /* ---- Back to the same list ----
+   * The address always describes the list on screen (search, region, city, sector,
+   * filters, sort, page), so the browser's Back button, the tender page's "Back to
+   * results" and a refresh all bring back the same results. The scroll position is
+   * remembered per list address (sessionStorage) and restored when coming back. */
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (filters.search) p.set('search', filters.search);
+    if (selectedCountry) p.set('country', selectedCountry);
+    if (europeMode && selectedCity) p.set('city', selectedCity);
+    if (selectedCategory) p.set('category', selectedCategory);
+    if (filters.status) p.set('status', filters.status);
+    if (filters.source_id) p.set('source_id', String(filters.source_id));
+    if (filters.state) p.set('state', filters.state);
+    if (filters.date_from) p.set('date_from', filters.date_from);
+    if (filters.date_to) p.set('date_to', filters.date_to);
+    if (filters.min_value) p.set('min_value', String(filters.min_value));
+    if (filters.max_value) p.set('max_value', String(filters.max_value));
+    if (filters.sort_by && filters.sort_by !== 'created_at') p.set('sort_by', filters.sort_by);
+    if (filters.sort_order && filters.sort_order !== 'desc') p.set('sort_order', filters.sort_order);
+    if (filters.page > 1) p.set('page', String(filters.page));
+    if (p.toString() !== searchParams.toString()) setSearchParams(p, { replace: true, state: location.state });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, selectedCategory, selectedCountry, selectedCity, europeMode]);
+
+  const listUrl = location.pathname + location.search;
+  const scrollKey = (url) => `tenderiq:listScroll:${url}`;
+  const scroller = () => document.querySelector('main');
+  // Remember where the list is scrolled to (for this exact list address)
+  useEffect(() => {
+    const main = scroller();
+    if (!main) return undefined;
+    let raf = 0;
+    const save = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        try { sessionStorage.setItem(scrollKey(listUrl), String(main.scrollTop)); } catch { /* storage full / blocked */ }
+      });
+    };
+    main.addEventListener('scroll', save, { passive: true });
+    return () => { main.removeEventListener('scroll', save); cancelAnimationFrame(raf); };
+  }, [listUrl]);
+  // Coming back (browser Back, or "Back to results"): scroll to where the user was
+  const restoredRef = useRef(false);
+  const comingBack = navigationType === 'POP' || !!location.state?.backToList;
+  useEffect(() => {
+    if (restoredRef.current || loading || !comingBack) return;
+    restoredRef.current = true;
+    const y = Number(sessionStorage.getItem(scrollKey(listUrl)) || 0);
+    const main = scroller();
+    if (main && y > 0) requestAnimationFrame(() => { main.scrollTop = y; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, tenders]);
+  /** Open a tender, remembering this list (for its "Back to results" button). */
+  const openTender = (id, hash = '') => {
+    rememberList(id);
+    navigate(`/tenders/${id}${hash}`, { state: { fromList: listUrl } });
+  };
+  const rememberList = (id) => {
+    try {
+      sessionStorage.setItem(`tenderiq:fromList:${id}`, listUrl);
+      const main = scroller();
+      if (main) sessionStorage.setItem(scrollKey(listUrl), String(main.scrollTop));
+    } catch { /* ignore */ }
+  };
 
   // silent: refresh the list in place (live updates) without the loading state
   const fetchTenders = useCallback(async (silent = false) => {
@@ -1136,6 +1206,8 @@ function TendersPageContent() {
                         <td className={`px-4 ${rowPad}`}>
                           <Link
                             to={`/tenders/${tender.id}`}
+                            state={{ fromList: listUrl }}
+                            onClick={() => rememberList(tender.id)}
                             className="block min-w-0"
                           >
                             <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-blue-600">
@@ -1212,6 +1284,8 @@ function TendersPageContent() {
                           ) : (
                           <Link
                             to={`/tenders/${tender.id}#notes`}
+                            state={{ fromList: listUrl }}
+                            onClick={() => rememberList(tender.id)}
                             className="block truncate text-sm italic text-gray-400 hover:text-gray-600 hover:not-italic"
                           >
                             Click to add note...
@@ -1268,7 +1342,7 @@ function TendersPageContent() {
                   )}
                   <li
                     className="px-4 py-3 active:bg-blue-50/40 transition-colors"
-                    onClick={() => navigate(`/tenders/${tender.id}`)}
+                    onClick={() => openTender(tender.id)}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="line-clamp-2 text-sm font-semibold text-gray-900">
@@ -1328,7 +1402,7 @@ function TendersPageContent() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/tenders/${tender.id}`);
+                          openTender(tender.id);
                         }}
                         title="View tender"
                         className="rounded-lg p-2 text-gray-500 hover:bg-blue-100 hover:text-blue-600"
