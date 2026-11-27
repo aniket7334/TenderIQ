@@ -279,6 +279,44 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 - **First run (local, 27 Nov 2026):** 22 rows read, 14 new tenders stored (8 GeM duplicates skipped), each with its PDFs; a second run adds nothing.
 - The source row is added automatically once per database at server start (`ensureBuiltInSources` in `scrapeTasks.js`, recorded in `app_migrations` as `source_mumbai_port_2026_11`) — an admin can switch it off or delete it in Admin → Sources and it won't come back.
 
+**Cochin Port Authority** (`adapter_type = 'copa'`, `src/scrapers/adapters/copaAdapter.js`) — the port's own list on **cochinport.gov.in** (without "www.": `www.cochinport.gov.in` redirects to itself forever). `/tenders/<code>?page=N`, 10 a page; the `<code>` is a token from the site menu, read from the homepage each run. Each tender has a hidden details card on the same page (department, number, description, category, tender value, EMD, document cost, last date, opening date, contact, attachments), so one request per page gives everything. Amounts are written many ways ("Rs.22,200.00", "Rs 11,68,000/-", "Nil"). Bids: e-tenders on the port's Tender Wizard portal, land leases on MSTC (numbers "MSTC/…"), budgetary offers as the notice says. Added automatically (`source_cochin_port_2026_11`). First run (local, 27 Nov 2026): 15 tenders (14 open) with 1–4 files each; none also on GeM (the Kochi GeM bids are Hooghly Cochin Shipyard's and DCI's); a second run adds nothing.
+
+**Source access status (checked 27 Nov 2026, from India):**
+
+| Body | How TenderIQ gets its tenders | Access problem on its own site |
+|---|---|---|
+| Mumbai Port | Own site (`mbpt`) + CPPP | — |
+| JNPA | CPPP | — (own site readable too) |
+| Deendayal (Kandla) | Own site JSON API (`dpa`) | Site is a JavaScript app — read through its API |
+| Paradip | CPPP (under "Ministry of Shipping") | — |
+| Visakhapatnam | eTenders | — |
+| Chennai | CPPP | — |
+| Kamarajar (Ennore) | CPPP (under "Ministry of Shipping") | — |
+| V.O. Chidambaranar | eTenders | — |
+| Cochin Port | Own site (`copa`) | `www.` address loops forever — use cochinport.gov.in |
+| New Mangalore | CPPP | Site's HTTPS certificate chain is incomplete (strict clients refuse it) |
+| Mormugao | CPPP | Old address mptgoa.gov.in no longer exists — now mormugaoport.gov.in |
+| Kolkata / Haldia (SMP) | CPPP | kolkataporttrust.gov.in has a certificate error; newer addresses not found |
+| Vadhvan Port | eTenders | vadhvanport.com does not connect; vadhavanport.in is an empty page |
+| Indian Ports Association | CPPP | ipa.nic.in does not connect |
+| Sagarmala | — (no tenders found on CPPP / eTenders) | sagarmala.gov.in does not connect |
+| DCI (Dredging Corporation) | CPPP (under "Ministry of Shipping") | — |
+| IWAI | CPPP | iwai.nic.in does not connect |
+| Gujarat Maritime Board | Not yet (nProcure) | gmbports.org: certificate chain incomplete |
+| Maharashtra Maritime Board | Not yet (MahaTenders) | Site is a JavaScript app (738-byte page) |
+| Kerala Maritime Board | Not yet | Readable at kmb.kerala.gov.in |
+| Tamil Nadu Maritime Board | Not yet (TN Tenders) | tnmaritime.in does not connect — now tnmaritime.tn.gov.in |
+| Karnataka Maritime Board | Not yet (KPPP) | Readable at karnatakaports.in |
+| Andhra Pradesh Maritime Board | Not yet | apmaritime.in is a JavaScript app (479-byte page) |
+| Odisha (ports / waterways) | Not yet (Odisha tenders) | Address not found; odishatransport.gov.in has a certificate error |
+| State portals: MahaTenders, TN Tenders, Kerala, Odisha | Not yet | Readable at `/nicgep/app` (same NIC software as CPPP) |
+| Gujarat nProcure | Not yet | www.nprocure.com does not connect; tender.nprocure.com answers |
+| Karnataka KPPP | Not yet | Readable (needs a closer look) |
+
+Not tested yet: whether each works from Render (Singapore) — some Indian government sites refuse foreign servers.
+
+**Deendayal Port Authority, Kandla** (`adapter_type = 'dpa'`, `src/scrapers/adapters/dpaAdapter.js`) — the port's own site **deendayalport.gov.in** is a JavaScript app fed by a public JSON API (`/api/tender-active-and-archives`, filtered to tenders still open). One request lists every open tender with number, subject, department, dates, type (NIT / E-tender / EOI / E-Auction) and its documents (tender file + corrigenda, often ZIPs), stored as source files. Stored with buyer Deendayal Port Authority, issued by "<department>, Deendayal Port Authority", Kandla, Gujarat; the type goes to the scope. Unfinished numbers on the site ("MR/WK/") get the record ID ("MR/WK/ (DPA-15940)") so two of them are never taken for one tender. The port takes e-tender bids on nProcure, CPPP or GeM (its E-Tender page links them). Added automatically (`source_deendayal_port_2026_11`). First run (local, 27 Nov 2026): 20 open tenders (3 company-keyword, 6 other marine), none also on GeM; a second run adds nothing.
+
 **Port tenders on CPPP / eTenders, organisation by organisation** (`adapter_type = 'cppp_org'` on **eprocure.gov.in**, `'etenders'` on **etenders.gov.in**; both `etendersAdapter.js`, the same NIC software on two hosts). The source's config names the organisation exactly as the portal lists it (`org`), plus its city and state. Each row reads "[work] [office ref][Tender ID]": stored with the **work as title**, the **Tender ID** (e.g. `2026_JNPT_935034_1`) as reference, the **port as buyer** and the office in "issued by" ("Materials - CME - JNPT, Jawaharlal Nehru Port Trust"). Bids go through CPPP / eTenders with the Tender ID (Where to view and apply).
 - **JNPA — Jawaharlal Nehru Port** (`cppp_org`, org "Jawaharlal Nehru Port Trust", Navi Mumbai): added automatically (`source_jnpa_cppp_2026_11`). First run (local, 27 Nov 2026): 11 open tenders, none also on GeM (GeM lists only the ministry; the JNPA rows are works, leases and services that go through CPPP).
 - Other ports and maritime bodies listed on CPPP by organisation (counts on 27 Nov 2026): Kolkata Port Trust 23, Ministry of Shipping 26, Andaman Lakshadweep Harbour Works 21, New Mangalore Port Trust 19, IWAI 12, Mumbai Port Trust 9, DG Lighthouses 9, DG Shipping 5, Chennai Port Trust 3, Mormugao 2, Indian Ports Association 1. On eTenders: Cochin Shipyard 28, Visakhapatnam 15, Indian Port Rail Corp 7, VOC 5, Vadhvan 1.
@@ -663,6 +701,8 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 51. **City with the country** — "Mumbai, India" in the Tenders list (Region column and cards) from the source's city or the first city named in the tender; Location on the tender page without repeats.
 52. **New source: JNPA (Jawaharlal Nehru Port) via CPPP** — a CPPP organisation-wise reader (`cppp_org`) that any port on eprocure.gov.in can use; eTenders / CPPP tenders now stored with a clean title, the Tender ID as reference and the port as buyer (older ones tidied once); Navi Mumbai is its own city (JNPA, Nhava Sheva, Vashi, Belapur).
 53. **All ports on CPPP / eTenders** — 12 more port and maritime sources (Kolkata / Haldia, New Mangalore, Chennai, Mormugao, Mumbai on CPPP, IWAI, IPA, Andaman Lakshadweep Harbour Works, DG Lighthouses, DG Shipping, Paradip + DCI + Kamarajar, Cochin Shipyard), every page read (not just the first 20), real buyers for umbrella organisations; same-tender matches across sources are linked, not duplicated.
+54. **New source: Deendayal Port Authority (Kandla)** — read from the port site's JSON API: 20 open tenders with documents and corrigenda, hourly.
+55. **New source: Cochin Port Authority** — read from the port's own site (cochinport.gov.in, not www): 15 tenders with value, EMD, documents; plus a source access status list (which port / board sites can or can't be reached, and why).
 
 
 

@@ -417,6 +417,24 @@ const BUILT_IN_SOURCES = [
         config: { org, ...(location ? { location } : {}), ...(state ? { state } : {}) },
     })),
     {
+        migration: 'source_cochin_port_2026_11',
+        name: 'Cochin Port Authority',
+        base_url: 'https://cochinport.gov.in',
+        adapter_type: 'copa',
+        scrape_interval_minutes: 60,
+        priority: 8,
+        config: { org: 'Cochin Port Authority', location: 'Kochi', state: 'Kerala' },
+    },
+    {
+        migration: 'source_deendayal_port_2026_11',
+        name: 'Deendayal Port Authority (Kandla)',
+        base_url: 'https://www.deendayalport.gov.in',
+        adapter_type: 'dpa',
+        scrape_interval_minutes: 60,
+        priority: 8,
+        config: { org: 'Deendayal Port Authority', location: 'Kandla', state: 'Gujarat' },
+    },
+    {
         // CPPP lists Paradip Port, Dredging Corporation of India and Kamarajar (Ennore) Port under
         // "Ministry of Shipping"; each tender is stored with its own buyer and place
         migration: 'source_mos_2026_11',
