@@ -36,6 +36,9 @@ async function listSources() {
     'SELECT * FROM tender_sources ORDER BY priority DESC'
   );
 
+  // Whether each source is working (failing sources also alert the admins)
+  const health = await require('./sourceHealth.service').healthBySource().catch(() => ({}));
+
   // Get success rate from scrape_runs for each source
   const result = [];
   for (const row of rows) {
@@ -55,6 +58,7 @@ async function listSources() {
       total_runs: totalRuns,
       total_found: totalFound,
       total_new: totalNew,
+      health: health[row.id] || null,
     });
   }
   return result;

@@ -68,6 +68,7 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
         try {
             const org = this.config?.org || '';
             console.log(`[${this.portalName}] Fetching page ${page} for org: "${org}"...`);
+            if (page === 1) this.lastError = null;
             const host = this.config?.host || this.portalHost;
             // State portals (mahatenders, tntenders …) run the same software under /nicgep/app
             const appPath = this.config?.appPath || '/eprocure/app';
@@ -186,7 +187,9 @@ class EtendersAdapter extends baseAdapter_1.BaseAdapter {
             return tenders;
         }
         catch (err) {
-            console.error(`[eTenders] Scraper error: ${err.message}`);
+            // Recorded so a run that read nothing is marked failed with the reason (and admins told)
+            this.lastError = err.response ? `HTTP ${err.response.status}` : (err.code || err.message);
+            console.error(`[${this.portalName}] Scraper error: ${this.lastError}`);
             return [];
         }
     }

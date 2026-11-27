@@ -289,6 +289,12 @@ async function scrapeSource(sourceId, opts = {}) {
             .catch((e) => console.error('[Priority] refresh failed:', e.message));
         if (emptyRun)
             console.warn(`[Scrape] ${source.name}: read nothing — ${adapter.lastError}`);
+        // Tell the admins if the source stops working (and when it works again). GeM's frequent
+        // sync often has nothing new, so "read nothing" alone only counts for the other sources.
+        await require('../services/sourceHealth.service').recordRun(source, {
+            found: source.adapter_type === 'gem' && !emptyRun ? Math.max(tendersFound, 1) : tendersFound,
+            error: emptyRun ? adapter.lastError : null,
+        });
         // A run cut short didn't reach the previous run's bids, so don't move
         // the "caught up to" mark (the next run re-reads from the same point)
         if (!timedOut && !emptyRun)
@@ -303,6 +309,7 @@ async function scrapeSource(sourceId, opts = {}) {
             ['failed', err.message, tendersFound, tendersNew, runId]
         );
         console.error(`Scrape failed for source ${source.name}:`, err);
+        await require('../services/sourceHealth.service').recordRun(source, { found: 0, error: err.code || err.message });
     }
 }
 

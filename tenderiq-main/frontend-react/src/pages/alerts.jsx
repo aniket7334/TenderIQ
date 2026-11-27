@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import {
   ArrowRight,
   Bell,
+  CheckCircle2,
+  ServerCrash,
   BellOff,
   BellRing,
   Check,
@@ -53,6 +55,9 @@ const ALERT_STYLES = {
   // Admins only: every new account (sign-up waiting for approval / account created)
   signup_pending: { icon: UserPlus, cls: 'bg-blue-50 text-blue-700 ring-blue-100', label: 'Sign-up · needs approval' },
   account_created: { icon: UserPlus, cls: 'bg-blue-50 text-blue-700 ring-blue-100', label: 'New account' },
+  // Admins only: a tender source stopped working / works again
+  source_failed: { icon: ServerCrash, cls: 'bg-red-50 text-red-700 ring-red-100', label: 'Source not working' },
+  source_recovered: { icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-700 ring-emerald-100', label: 'Source working again' },
 };
 const alertStyle = (t) => ALERT_STYLES[t] || { icon: Info, cls: 'bg-gray-100 text-gray-600 ring-gray-200', label: 'Update' };
 
@@ -204,6 +209,7 @@ export default function AlertsPage() {
     if (alert.tender_id) navigate(`/tenders/${alert.tender_id}`);
     else if (/digest/.test(alert.alert_type)) navigate('/tenders');
     else if (alert.alert_type === 'signup_pending' || alert.alert_type === 'account_created') navigate('/admin/users');
+    else if (alert.alert_type === 'source_failed' || alert.alert_type === 'source_recovered') navigate('/admin/sources');
   };
 
   const anyOn = settings?.notify_new_tenders || settings?.notify_deadlines;

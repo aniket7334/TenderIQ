@@ -275,6 +275,14 @@ export default function SourcesPage() {
       return <Badge variant="default">{source.status === 'busy' ? 'Busy' : source.status === 'loading' ? 'Loading' : 'Unreachable'}</Badge>;
     }
     if (!source.is_active) return <Badge variant="default">Inactive</Badge>;
+    // Failed several runs in a row (admins got an alert): say what's wrong on hover
+    if (source.health?.failing) {
+      return (
+        <span title={`This source ${source.health.reason}. Detail: ${source.health.error || '-'}`}>
+          <Badge variant="danger">Not working</Badge>
+        </span>
+      );
+    }
     if (source.status === 'error') return <Badge variant="danger">Error</Badge>;
     return <Badge variant="success">Active</Badge>;
   };

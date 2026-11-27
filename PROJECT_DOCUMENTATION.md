@@ -289,6 +289,8 @@ TiDB specifics handled in code: TLS required; no FULLTEXT index (skipped); a STO
 
 **Gujarat Maritime Board certificate:** gmbports.org sometimes sends its certificate without the intermediate that signed it, and Node then refuses it (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`; browsers fetch the missing piece themselves). The reader trusts the normal roots plus that one public intermediate, kept in `src/scrapers/certs/rapidsslG5Intermediate.js` (a .js file because `*.pem` is git-ignored to keep private keys out) (DigiCert RapidSSL G5 TLS RSA4096 SHA384 2022 CA1, signed by DigiCert TLS RSA4096 Root G5, valid to 2032) — certificate checking stays on.
 
+**Source not working → admins are told** (`services/sourceHealth.service.js`, called after every scrape run). A run counts as failing when it read nothing and the reader recorded an error (refused, timed out, HTTP 403, certificate …), when it threw, or when a source that had tenders before reads none with no error (usually a website change; not counted for GeM's frequent sync). After **2 failing runs in a row** every active admin gets **one** in-app alert (bell + Alerts page, type `source_failed`, red "Source not working") naming the source and the problem in plain words — e.g. "refused our connection — the website may be blocking servers outside India", "is not responding (the request timed out)", "denied access (HTTP 403)", "has a security certificate problem" — plus the technical detail. No repeats while it stays broken; the first run that works again sends "Source working again" (`source_recovered`, with since when it was down). Admin → Sources shows a red **Not working** badge (hover: the reason) from `health` in `GET /sources`. State per source in the `source_health` table (created automatically). Clicking either alert opens Admin → Sources. In-app only for now (e-mail alerts are deferred).
+
 **Source access status (checked 27 Nov 2026, from India):**
 
 | Body | How TenderIQ gets its tenders | Access problem on its own site |
@@ -718,6 +720,7 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 57. **New source: Gujarat Maritime Board** — the board's live tenders from gmbports.org (titles and dates; bidding on nProcure).
 58. **Refresh button on the Tenders page** (fetch from all sources, with progress) **and new source: Karnataka Ports and Inland Water Transport (KPPP)**; Gujarat Maritime Board's missing intermediate certificate supplied so its reads don't fail.
 59. **Dashboard Refresh = Tenders Refresh** (one shared hook: admins fetch from all sources with progress; "GeM Now" and "Scrape Now" kept beside it); Andhra Pradesh Maritime Board checked and left out (its tender API exposes downloaders' personal data).
+60. **Admins are told when a source stops working** (refused, not responding, access denied, certificate problem, or suddenly empty — after 2 failed runs in a row, once) **and when it works again**; "Not working" badge with the reason on Admin → Sources. The eTenders / CPPP / state-portal reader now records its errors.
 
 
 
