@@ -32,7 +32,7 @@ const PRIORITY_PATTERNS = [
     'dredg\\w*', 'desilting', 'de-silting', 'silt removal', 'capital dredging', 'maintenance dredging',
     // Marine construction
     'jett(y|ies)', 'wharf', 'wharves', 'breakwaters?', 'harbou?rs?', 'berthing',
-    '(cargo|container|multi-?purpose|oil|coal|liquid|bulk|passenger|fishing|deep[- ]?draft|construction of( the)?|repairs? (to|of)( the)?) berths?',
+    '(cargo|container|multi-?purpose|oil|coal|liquid|bulk|passenger|fishing|chemical|lpg|lng|pol|deep[- ]?draft|construction of( the)?|repairs? (to|of)( the)?) berths?',
     'berths? (no\.?|construction|repairs?|works?|structure|extension)',
     'dry ?docks?', 'dockyards?', 'floating docks?', 'slipways?', 'quay( walls?)?', 'groynes?',
     'sea ?walls?', 'shore protection', 'coastal( protection| works| erosion)?', 'coast protection',
@@ -46,6 +46,7 @@ const PRIORITY_PATTERNS = [
     // Shipping & vessels
     'ship ?building', 'ship ?repairs?', 'ship ?yard', 'ships?', 'vessels?', 'tugs?', 'tug ?boats?',
     'barges?', 'dredgers?', 'boats?', 'pontoons?', 'lighthouses?', 'light houses?', 'cargo handling',
+    'diving( works?| services?| operations?)?', 'divers?', 'salvage', 'marinas?', 'waterfront',
     // Company focus list (Nov 2026): reclamation, terminals, piling, desilting, intake / outfall,
     // tunnelling, trenching, HDD, subsea cables, marine surveys, MLD plants
     '(land )?reclamation', 'reservoir (dredging|desilting)', 'sediment removal', 'desiltation',
@@ -60,7 +61,8 @@ const PRIORITY_PATTERNS = [
     'mld', '[0-9]+ ?mld', 'million lit(re|er)s? per day',
 ];
 // Phrases that look marine but aren't
-const NOT_PRIORITY = ['pressure vessels?', '(cryogenic|vacuum|mixing|culture|lpg|gas|chemical|process) vessels?', 'vessel sealing', 'blood vessels?', 'without vessels?', 'storage vessels?', 'reaction vessels?', 'marine plywood', 'ship(ping|ment) charges?', 'shipping address'];
+// (also the buyer's own name: "... at Mumbai Port Authority" says who buys, not what the work is)
+const NOT_PRIORITY = ['reclamation estates?', '(sewree|sewri|mazgaon|colaba|wadala|haji bunder|frere) reclamation', 'mumbai port( authority| trust)?', 'mbp[at]', 'port authority hospital', 'pressure vessels?', '(cryogenic|vacuum|mixing|culture|lpg|gas|chemical|process) vessels?', 'vessel sealing', 'blood vessels?', 'without vessels?', 'storage vessels?', 'reaction vessels?', 'marine plywood', 'ship(ping|ment) charges?', 'shipping address'];
 
 const toRegex = (list) => new RegExp(`(^|[^a-z0-9])(${list.join('|')})(?=[^a-z0-9]|$)`, 'i');
 const POSITIVE = toRegex(PRIORITY_PATTERNS);
@@ -90,7 +92,7 @@ const FOCUS_PATTERNS = [
     // Marine structures & coastal protection
     'breakwaters?', 'marine (works?|construction|structures?|civil)', 'shore protection', 'coast(al)? protection',
     'sea ?walls?', 'revetments?', 'groynes?', 'anti[- ]sea erosion',
-    '(cargo|container|multi-?purpose|oil|coal|liquid|bulk|passenger|fishing|deep[- ]?draft|construction of( the)?|repairs? (to|of)( the)?) berths?',
+    '(cargo|container|multi-?purpose|oil|coal|liquid|bulk|passenger|fishing|chemical|lpg|lng|pol|deep[- ]?draft|construction of( the)?|repairs? (to|of)( the)?) berths?',
     'berths? (no\\.?|construction|repairs?|works?|structure|extension)', 'berthing',
     'jett(y|ies)', 'wharf', 'wharves', 'quays?( walls?)?',
     // Ports & terminals
@@ -119,7 +121,7 @@ const FOCUS_PATTERNS = [
 ];
 const FOCUS = toRegex(FOCUS_PATTERNS);
 // Other meanings of the added words, left out of the TOP level only
-const NOT_FOCUS = ['(usb[- ]?c?|laptop|docking) docks?', 'weigh(ing)? ?bridges?', 'diode bridges?', '(rectifier|thyristor|scr) bridges?', '(cryogenic|vacuum|mixing|culture|lpg|gas|chemical|process) vessels?', 'bridge rectifiers?', 'wheatstone bridges?', 'network bridges?', 'h[- ]bridges?', 'bridge (cameras?|amplifiers?|circuits?)'];
+const NOT_FOCUS = ['reclamation estates?', '(sewree|sewri|mazgaon|colaba|wadala|haji bunder|frere) reclamation', '(usb[- ]?c?|laptop|docking) docks?', 'weigh(ing)? ?bridges?', 'diode bridges?', '(rectifier|thyristor|scr) bridges?', '(cryogenic|vacuum|mixing|culture|lpg|gas|chemical|process) vessels?', 'bridge rectifiers?', 'wheatstone bridges?', 'network bridges?', 'h[- ]bridges?', 'bridge (cameras?|amplifiers?|circuits?)'];
 const NEGATIVE_FOCUS = new RegExp(`(${NOT_FOCUS.join('|')})`, 'gi');
 
 // Procurement: the MIDDLE of the list (below marine, above everything else) — it

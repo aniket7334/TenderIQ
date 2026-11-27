@@ -21,6 +21,9 @@ function startScheduler() {
     // in Admin → Sources, each at its own interval (src/sources/index.js)
     require('../sources').init();
 
+    // Sources TenderIQ adds itself (e.g. Mumbai Port Authority) — once per database
+    require('./scrapeTasks').ensureBuiltInSources().catch((e) => console.error('[Sources] setup failed:', e.message));
+
 
     // Scrape all active sources every 1 hour to check for new tenders
     cron.schedule('0 * * * *', async () => {

@@ -7,12 +7,15 @@ const gemAdapter_1 = require("./gemAdapter");
 const cpppAdapter_1 = require("./cpppAdapter");
 const irepsAdapter_1 = require("./irepsAdapter");
 const etendersAdapter_1 = require("./etendersAdapter");
+const { MbptAdapter } = require("./mbptAdapter");
 const registry = new Map();
 registry.set('generic', genericListingAdapter_1.GenericListingAdapter);
 registry.set('gem', gemAdapter_1.GemAdapter);
 registry.set('cppp', cpppAdapter_1.CpppAdapter);
 registry.set('ireps', irepsAdapter_1.IrepsAdapter);
 registry.set('etenders', etendersAdapter_1.EtendersAdapter);
+// Mumbai Port Authority's own tender pages (mumbaiport.gov.in)
+registry.set('mbpt', MbptAdapter);
 function getAdapter(adapterType, baseUrl, config) {
     const Ctor = registry.get(adapterType) || genericListingAdapter_1.GenericListingAdapter;
     return new Ctor(baseUrl, config);

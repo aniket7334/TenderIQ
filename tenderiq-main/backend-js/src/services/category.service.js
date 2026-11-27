@@ -78,9 +78,13 @@ function keywordPattern(keyword) {
   return KEYWORD_PATTERNS.get(key);
 }
 
+// Place names that contain a sector word ("Mazgaon Sewree Reclamation Estate" is an
+// address, not reclamation work) — removed before matching
+const PLACE_NAMES = /reclamation estates?|(sewree|sewri|mazgaon|colaba|wadala|haji bunder|frere) reclamation/gi;
+
 function detectCategories(text) {
   if (!text) return [];
-  const lowerText = text.toLowerCase();
+  const lowerText = text.toLowerCase().replace(PLACE_NAMES, ' ');
   const matched = [];
   const seen = new Set();
   for (const rule of CATEGORY_RULES) {

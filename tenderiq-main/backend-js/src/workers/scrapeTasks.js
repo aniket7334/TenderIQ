@@ -145,6 +145,12 @@ async function scrapeSource(sourceId, opts = {}) {
                     );
                     if (existing.length) continue;
                 }
+                // Same tender already stored under another number (e.g. a port's tender that is
+                // a GeM bid the GeM sync already saved): don't show it twice
+                if (Array.isArray(listing.alsoKnownAs) && listing.alsoKnownAs.length) {
+                    const [dup] = await pool.query('SELECT id FROM tenders WHERE reference_no IN (?) LIMIT 1', [listing.alsoKnownAs]);
+                    if (dup.length) { tendersSkipped++; continue; }
+                }
 
                 // Categorise up front: some sources (GeM) only keep tenders that
                 // fall into one of our categories.
@@ -168,9 +174,10 @@ async function scrapeSource(sourceId, opts = {}) {
 
                 // Fetch detail if URL available
                 let detail = {};
-                if (listing.sourceUrl && !adapter.skipDetail) {
+                // detailUrl: a separate details address when sourceUrl is the human-facing page
+                if ((listing.detailUrl || listing.sourceUrl) && !adapter.skipDetail) {
                     try {
-                        detail = await adapter.fetchDetail(listing.sourceUrl);
+                        detail = await adapter.fetchDetail(listing.detailUrl || listing.sourceUrl);
                         if (detail.estimatedProjectCost) {
                             console.log(`  [Detail] Got estimated cost: ${detail.estimatedProjectCost} for "${listing.title?.substring(0, 50)}"`);
                         }
@@ -230,9 +237,11 @@ async function scrapeSource(sourceId, opts = {}) {
                 // Create document refs
                 const docs = detail.documents || listing.documents || [];
                 for (const doc of docs) {
+                    // storage_key 'source': listed under the source's files (not "uploaded by your team");
+                    // ocr_status 'skipped': the AI extraction job (paid API calls) leaves them alone
                     await pool.execute(
-                        'INSERT INTO tender_documents (id, tender_id, file_name, file_path, file_type, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-                        [uuidv4(), tenderId, doc.name, doc.url, doc.fileType || null]
+                        "INSERT INTO tender_documents (id, tender_id, file_name, file_path, file_type, storage_key, ocr_status, created_at) VALUES (?, ?, ?, ?, ?, 'source', 'skipped', NOW())",
+                        [uuidv4(), tenderId, String(doc.name || 'Document').slice(0, 255), doc.url, doc.fileType || null]
                     );
                 }
                 tendersNew++;
@@ -251,7 +260,7 @@ async function scrapeSource(sourceId, opts = {}) {
             }
         }
         if (tendersSkipped)
-            console.log(`[Scrape] ${source.name}: skipped ${tendersSkipped} listings that match none of our categories`);
+            console.log(`[Scrape] ${source.name}: skipped ${tendersSkipped} listings (outside our categories, or already stored under another number)`);
 
         // A run that read nothing at all didn't really work — record why
         const emptyRun = tendersFound === 0 && adapter.lastError;
@@ -343,3 +352,43 @@ async function cleanupOldRuns() {
         [thirtyDaysAgo]
     );
 }
+
+/*
+ * Sources TenderIQ adds by itself (once per database — local and live — at server
+ * start, recorded in app_migrations so a source an admin deletes doesn't come back).
+ */
+const BUILT_IN_SOURCES = [
+    {
+        migration: 'source_mumbai_port_2026_11',
+        name: 'Mumbai Port Authority',
+        base_url: 'https://mumbaiport.gov.in',
+        adapter_type: 'mbpt',
+        scrape_interval_minutes: 60,
+        priority: 8,
+        config: { org: 'Mumbai Port Authority', location: 'Mumbai', state: 'Maharashtra' },
+    },
+];
+async function ensureBuiltInSources() {
+    await pool.query(`CREATE TABLE IF NOT EXISTS app_migrations (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        applied_at DATETIME NOT NULL,
+        note VARCHAR(255) NULL
+    )`);
+    const added = [];
+    for (const s of BUILT_IN_SOURCES) {
+        const [[done]] = await pool.query('SELECT id FROM app_migrations WHERE id = ?', [s.migration]);
+        if (done) continue;
+        const [[exists]] = await pool.query('SELECT id FROM tender_sources WHERE adapter_type = ? OR name = ? LIMIT 1', [s.adapter_type, s.name]);
+        if (!exists) {
+            await pool.query(
+                `INSERT INTO tender_sources (id, name, base_url, adapter_type, is_active, scrape_interval_minutes, config, priority, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, 1, ?, ?, ?, NOW(), NOW())`,
+                [uuidv4(), s.name, s.base_url, s.adapter_type, s.scrape_interval_minutes, JSON.stringify(s.config), s.priority]);
+            added.push(s.name);
+        }
+        await pool.query('INSERT INTO app_migrations (id, applied_at, note) VALUES (?, NOW(), ?)', [s.migration, exists ? 'already there' : 'source added']);
+    }
+    if (added.length) console.log(`[Sources] added: ${added.join(', ')}`);
+    return added;
+}
+exports.ensureBuiltInSources = ensureBuiltInSources;
