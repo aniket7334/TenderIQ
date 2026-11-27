@@ -89,6 +89,8 @@ function serializeTender(tender, tags, source, assignee, comments, documents, no
         assigned_to: tender.assigned_to || null,
         assigned_to_name: assignee ? assignee.full_name : null,
         priority: 'medium',
+        // 2 = matches the company keyword list (listed first of all), 1 = other marine, 0 = other
+        priority_level: Number(tender.is_priority || 0),
         tags: tagNames,
         notes_count: noteCount !== undefined ? noteCount : 0,
         documents_count: docCount !== undefined ? docCount : 0,

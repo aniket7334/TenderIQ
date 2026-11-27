@@ -1,7 +1,9 @@
 "use strict";
 /**
  * First-priority tenders: dredging, marine construction, pipelines, shipping
- * and vessels. They get tenders.is_priority = 1 and are listed first on the
+ * and vessels. They get tenders.is_priority = 2 (3 for the company keyword list,
+ * 1 for procurement in the middle; see priorityLevel)
+ * which comes first of all) and are listed first on the
  * Tenders page and the Dashboard.
  *
  * Priority is decided from the tender's work description (title + name of
@@ -58,7 +60,7 @@ const PRIORITY_PATTERNS = [
     'mld', '[0-9]+ ?mld', 'million lit(re|er)s? per day',
 ];
 // Phrases that look marine but aren't
-const NOT_PRIORITY = ['pressure vessels?', 'vessel sealing', 'blood vessels?', 'without vessels?', 'storage vessels?', 'reaction vessels?', 'marine plywood', 'ship(ping|ment) charges?', 'shipping address'];
+const NOT_PRIORITY = ['pressure vessels?', '(cryogenic|vacuum|mixing|culture|lpg|gas|chemical|process) vessels?', 'vessel sealing', 'blood vessels?', 'without vessels?', 'storage vessels?', 'reaction vessels?', 'marine plywood', 'ship(ping|ment) charges?', 'shipping address'];
 
 const toRegex = (list) => new RegExp(`(^|[^a-z0-9])(${list.join('|')})(?=[^a-z0-9]|$)`, 'i');
 const POSITIVE = toRegex(PRIORITY_PATTERNS);
@@ -68,6 +70,73 @@ const NEGATIVE = new RegExp(`(${NOT_PRIORITY.join('|')})`, 'gi');
 function isPriorityText(text) {
     if (!text) return false;
     return POSITIVE.test(String(text).replace(NEGATIVE, ' '));
+}
+
+/*
+ * TOP priority (level 3): the company's own keyword list (Nov 2026) — dredging,
+ * reclamation, breakwaters, marine structures, shore protection, berths, jetties,
+ * quays, wharves, port expansion, terminals, offshore marine works, piling /
+ * dolphins, desilting, intake / outfall / marine pipelines, tunnelling, TBM,
+ * trenching, HDD, subsea cables, marine surveys, MLD. These come above the other
+ * priority tenders (level 2: tugs, boats, lighthouses, general pipelines …) and
+ * procurement (level 1, middle).
+ * Phrases are specific on purpose: bare "port" ("4 port DVR"), "berth" (railway
+ * coach berths), "offshore" (ONGC spare parts) or "HDD" (hard disks) are not used.
+ */
+const FOCUS_PATTERNS = [
+    // Dredging, reclamation, desilting
+    'dredg\\w*', 'desilting', 'de-silting', 'desiltation', 'silt removal', 'sediment (removal|management)',
+    '(land )?reclamation',
+    // Marine structures & coastal protection
+    'breakwaters?', 'marine (works?|construction|structures?|civil)', 'shore protection', 'coast(al)? protection',
+    'sea ?walls?', 'revetments?', 'groynes?', 'anti[- ]sea erosion',
+    '(cargo|container|multi-?purpose|oil|coal|liquid|bulk|passenger|fishing|deep[- ]?draft|construction of( the)?|repairs? (to|of)( the)?) berths?',
+    'berths? (no\\.?|construction|repairs?|works?|structure|extension)', 'berthing',
+    'jett(y|ies)', 'wharf', 'wharves', 'quays?( walls?)?',
+    // Ports & terminals
+    'port (expansion|development|infrastructure|connectivity)', 'sea ?ports?', 'minor ports?', 'major ports?',
+    '(container|cargo|cruise|passenger|ro-?ro|liquid|bulk|lng|oil|marine|multi-?purpose) terminals?',
+    'fishing (harbou?rs?|ports?|jett(y|ies))',
+    // Offshore, piling, foundations
+    'offshore (works?|construction|structures?|jett(y|ies)|pipe ?lines?|marine|civil)', 'nearshore',
+    'piling', 'pile foundations?', 'marine foundations?', 'sheet piles?', 'bored piles?', '(mooring |berthing )?dolphins?',
+    // Intake / outfall / marine pipelines
+    '(water|raw water|sea ?water|river|cooling[- ]water) intakes?', 'intake (wells?|structures?|pipe ?lines?|pump ?house|channel|jett(y|ies)|works?)',
+    'outfalls?', 'cooling[- ]water', '(marine|subsea|submarine|undersea|offshore) pipe ?lines?',
+    // Tunnelling, trenching, HDD
+    'tunnel(l)?ing', 'tbm', 'tunnel boring( machines?)?', 'micro ?tunnel(l)?ing', 'tunnel (construction|lining|excavation|works?)',
+    '(road|rail|railway|metro|subsea|undersea|marine|utility|cable|water) tunnels?',
+    'trenching', '(cable|pipe ?line|marine) trench(es)?',
+    'hdd (crossings?|method|works?|drilling|technique|technology)', '(by|through) hdd', 'horizontal directional drilling', 'directional drilling', 'trenchless',
+    // Subsea cables, surveys, MLD
+    '(subsea|submarine|undersea|marine|offshore) cables?', 'duct banks?', 'cable landing',
+    'hydrographic( surveys?)?', 'bathymetr(y|ic)( surveys?)?', '(marine|offshore) geotechnical', 'geotechnical investigations?', 'seabed surveys?',
+    'mld', '[0-9]+ ?mld', 'million lit(re|er)s? per day',
+    // Added to the top list (Nov 2026): shipping, dock, harbour, bridge, water / plumbing, vessel
+    'shipping', 'docks?', 'dry ?docks?', 'dockyards?', 'floating docks?', 'harbou?rs?', 'bridges?',
+    'water supply', 'plumbing', 'drainage', 'sewage', 'sewerage', 'sewers?( lines?)?', 'water (pipe ?lines?|treatment|distribution)',
+    'vessels?',
+];
+const FOCUS = toRegex(FOCUS_PATTERNS);
+// Other meanings of the added words, left out of the TOP level only
+const NOT_FOCUS = ['(usb[- ]?c?|laptop|docking) docks?', 'weigh(ing)? ?bridges?', 'diode bridges?', '(rectifier|thyristor|scr) bridges?', '(cryogenic|vacuum|mixing|culture|lpg|gas|chemical|process) vessels?', 'bridge rectifiers?', 'wheatstone bridges?', 'network bridges?', 'h[- ]bridges?', 'bridge (cameras?|amplifiers?|circuits?)'];
+const NEGATIVE_FOCUS = new RegExp(`(${NOT_FOCUS.join('|')})`, 'gi');
+
+// Procurement: the MIDDLE of the list (below marine, above everything else) — it
+// matches about a quarter of all tenders, mostly GeM supply bids
+const PROCUREMENT = toRegex(['procurement', 'supply', 'purchase', 'equipments?']);
+
+/**
+ * Priority level (stored in tenders.is_priority, higher = listed first):
+ *   3 = company keyword list (top)            2 = other marine / shipping / pipeline
+ *   1 = procurement (middle)                  0 = everything else
+ */
+function priorityLevel(text) {
+    if (!text) return 0;
+    const clean = String(text).replace(NEGATIVE, ' ');
+    if (FOCUS.test(clean.replace(NEGATIVE_FOCUS, ' '))) return 3;
+    if (POSITIVE.test(clean)) return 2;
+    return PROCUREMENT.test(clean) ? 1 : 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,12 +216,11 @@ async function refreshPriority({ ids, since } = {}) {
         params.push(since, since);
     }
     const [rows] = await pool.query(`SELECT id, title, name_of_work, is_priority FROM tenders ${where}`, params);
-    const turnOn = [];
-    const turnOff = [];
+    // is_priority holds the LEVEL: 3 company keyword list, 2 other marine, 1 procurement, 0 other
+    const byLevel = { 0: [], 1: [], 2: [], 3: [] };
     for (const r of rows) {
-        const want = isPriorityText(`${r.title || ''} ${r.name_of_work || ''}`);
-        if (want && !r.is_priority) turnOn.push(r.id);
-        else if (!want && r.is_priority) turnOff.push(r.id);
+        const want = priorityLevel(`${r.title || ''} ${r.name_of_work || ''}`);
+        if (want !== Number(r.is_priority || 0)) byLevel[want].push(r.id);
     }
     const apply = async (list, value) => {
         for (let i = 0; i < list.length; i += 500) {
@@ -160,9 +228,11 @@ async function refreshPriority({ ids, since } = {}) {
             await pool.query(`UPDATE tenders SET is_priority = ? WHERE id IN (${chunk.map(() => '?').join(',')})`, [value, ...chunk]);
         }
     };
-    await apply(turnOn, 1);
-    await apply(turnOff, 0);
-    return turnOn.length + turnOff.length;
+    await apply(byLevel[3], 3);
+    await apply(byLevel[2], 2);
+    await apply(byLevel[1], 1);
+    await apply(byLevel[0], 0);
+    return byLevel[0].length + byLevel[1].length + byLevel[2].length + byLevel[3].length;
 }
 
 /** Server start: column, Pipeline tags for older tenders, full refresh. */
@@ -171,12 +241,12 @@ async function initPriority() {
         await ensureSchema();
         const tagged = await backfillSectorTags();
         const changed = await refreshPriority();
-        const [[{ c }]] = await pool.query('SELECT COUNT(*) AS c FROM tenders WHERE is_priority = 1');
-        console.log(`[Priority] ready — ${c} priority tenders (${changed} flags updated, ${tagged} sector tags added to older tenders)`);
+        const [[{ c, top }]] = await pool.query('SELECT SUM(is_priority >= 2) AS c, SUM(is_priority = 3) AS top FROM tenders');
+        console.log(`[Priority] ready — ${c} priority tenders (${top} from the company keyword list) (${changed} flags updated, ${tagged} sector tags added to older tenders)`);
     }
     catch (err) {
         console.error('[Priority] setup failed:', err.message);
     }
 }
 
-module.exports = { initPriority, refreshPriority, isPriorityReady, isPriorityText };
+module.exports = { initPriority, refreshPriority, isPriorityReady, isPriorityText, priorityLevel };

@@ -152,11 +152,21 @@ router.get('/facets', auth_1.authenticate, async (_req, res) => {
         const [[india]] = await pool.execute('SELECT COUNT(*) AS count FROM tenders');
         // Every sector is listed (0 when no tender has it yet), plus any hand-made tags
         const counts = new Map(sectors.map((r) => [r.sector, Number(r.count)]));
-        const { CATEGORY_NAMES } = require('../services/category.service');
+        const { CATEGORY_NAMES, FOCUS_SECTORS, MIDDLE_SECTORS } = require('../services/category.service');
         for (const name of CATEGORY_NAMES) if (!counts.has(name)) counts.set(name, 0);
+        // The company's focus sectors first (in the order of its keyword list), then the
+        // middle group (Procurement), then the rest by count — same order as tender priority
+        const focusOrder = new Map(FOCUS_SECTORS.map((s, i) => [s, i]));
+        const middle = new Set(MIDDLE_SECTORS);
+        const rank = (s) => (focusOrder.has(s) ? 0 : middle.has(s) ? 1 : 2);
         const sectorList = [...counts.entries()]
-            .map(([sector, count]) => ({ sector, count }))
-            .sort((a, b) => b.count - a.count || a.sector.localeCompare(b.sector));
+            .map(([sector, count]) => ({
+                sector, count,
+                focus: focusOrder.has(sector),
+                group: focusOrder.has(sector) ? 'focus' : middle.has(sector) ? 'middle' : 'other',
+            }))
+            .sort((a, b) => rank(a.sector) - rank(b.sector)
+                || (a.focus ? focusOrder.get(a.sector) - focusOrder.get(b.sector) : b.count - a.count || a.sector.localeCompare(b.sector)));
         res.json({
             sectors: sectorList,
             regions: india.count ? [{ country: 'India', count: Number(india.count) }] : [],

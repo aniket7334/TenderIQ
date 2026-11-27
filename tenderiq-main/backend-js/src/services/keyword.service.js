@@ -210,18 +210,32 @@ const COMPANY_KEYWORDS = [
   'hdd', 'horizontal directional drilling', 'subsea cable', 'duct bank',
   'marine geotechnical', 'hydrographic survey', 'bathymetric survey', 'mld',
 ];
+// Each batch is added once (its own app_migrations row). "procurement" is deliberately
+// NOT a keyword: keywords auto-shortlist new tenders, and it matches ~1 in 4 (supply bids).
+const COMPANY_KEYWORD_BATCHES = [
+  { id: COMPANY_KEYWORDS_ID, words: COMPANY_KEYWORDS },
+  { id: 'company_keywords_2026_11b', words: ['shipping', 'dock', 'harbour', 'bridge', 'water supply', 'plumbing', 'vessel'] },
+];
 async function ensureCompanyKeywords() {
+  const added = [];
+  for (const batch of COMPANY_KEYWORD_BATCHES) {
+    const r = await ensureKeywordBatch(batch.id, batch.words);
+    added.push(...r.added);
+  }
+  return { added };
+}
+async function ensureKeywordBatch(batchId, words) {
   await pool.query(`CREATE TABLE IF NOT EXISTS app_migrations (
       id VARCHAR(64) NOT NULL PRIMARY KEY,
       applied_at DATETIME NOT NULL,
       note VARCHAR(255) NULL
   )`);
-  const [[done]] = await pool.query('SELECT id FROM app_migrations WHERE id = ?', [COMPANY_KEYWORDS_ID]);
+  const [[done]] = await pool.query('SELECT id FROM app_migrations WHERE id = ?', [batchId]);
   if (done) return { added: [], skipped: true };
   const [rows] = await pool.query('SELECT LOWER(keyword) AS k FROM keywords');
   const have = new Set(rows.map((r) => r.k.trim()));
   const added = [];
-  for (const kw of COMPANY_KEYWORDS) {
+  for (const kw of words) {
     if (have.has(kw)) continue;
     const now = new Date();
     await pool.query(
@@ -231,8 +245,8 @@ async function ensureCompanyKeywords() {
     added.push(kw);
   }
   await pool.query('INSERT INTO app_migrations (id, applied_at, note) VALUES (?, NOW(), ?)',
-    [COMPANY_KEYWORDS_ID, `added ${added.length} keyword(s)`.slice(0, 255)]);
-  console.log(`[Keywords] company keyword list: added ${added.length} (${added.join(', ') || 'none'})`);
+    [batchId, `added ${added.length} keyword(s)`.slice(0, 255)]);
+  console.log(`[Keywords] company keyword list (${batchId}): added ${added.length} (${added.join(', ') || 'none'})`);
   return { added, skipped: false };
 }
 

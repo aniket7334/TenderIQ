@@ -177,6 +177,16 @@ const CATEGORY_OPTIONS = [
   { value: 'Procurement', label: 'Procurement', color: 'bg-emerald-100 text-emerald-700' },
 ];
 
+/** Small label for tenders matching the company keyword list (listed first). */
+const FocusLabel = () => (
+  <span
+    title="Matches your focus keywords — listed first"
+    className="inline-flex items-center rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700"
+  >
+    Focus
+  </span>
+);
+
 /** Deadline already passed? (No deadline = not shown as closed.) */
 const isClosedTender = (t) => !!t.submission_deadline && new Date(t.submission_deadline).getTime() < Date.now();
 
@@ -711,14 +721,30 @@ function TendersPageContent() {
                   ` (${sectorFacets.reduce((s, x) => s + x.count, 0)})`}
               </option>
               {sectorFacets.length > 0
-                ? sectorFacets.map((s) => (
-                    <option key={s.sector} value={s.sector}>
-                      {s.sector}
-                      {europeMode
-                        ? selectedCategory === s.sector && !loading ? ` (${total.toLocaleString()})` : ''
-                        : ` (${s.count})`}
-                    </option>
-                  ))
+                ? (() => {
+                    const renderOption = (s) => (
+                      <option key={s.sector} value={s.sector}>
+                        {s.sector}
+                        {europeMode
+                          ? selectedCategory === s.sector && !loading ? ` (${total.toLocaleString()})` : ''
+                          : ` (${s.count})`}
+                      </option>
+                    );
+                    // The company's focus sectors (its keyword list) on top, then every other sector
+                    // Same order as tender priority: focus sectors, then the middle group (Procurement), then the rest
+                    const focus = sectorFacets.filter((s) => s.focus);
+                    const middle = sectorFacets.filter((s) => s.group === 'middle');
+                    const other = sectorFacets.filter((s) => !s.focus && s.group !== 'middle');
+                    return focus.length > 0 ? (
+                      <>
+                        <optgroup label="Your focus sectors">{focus.map(renderOption)}</optgroup>
+                        {middle.length > 0 && <optgroup label="Next priority">{middle.map(renderOption)}</optgroup>}
+                        <optgroup label="Other sectors">{other.map(renderOption)}</optgroup>
+                      </>
+                    ) : (
+                      sectorFacets.map(renderOption)
+                    );
+                  })()
                 : CATEGORY_OPTIONS.slice(1).map((cat) => (
                     <option key={cat.value} value={cat.value}>
                       {cat.label}
@@ -1117,6 +1143,7 @@ function TendersPageContent() {
                             </p>
                             {tender.reference_number && (
                               <p className="mt-0.5 truncate font-mono text-[11px] text-gray-400">
+                                {tender.priority_level === 3 && <span className="mr-1.5 align-middle font-sans"><FocusLabel /></span>}
                                 {tender.reference_number}
                               </p>
                             )}
@@ -1268,6 +1295,7 @@ function TendersPageContent() {
                       </p>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                      {tender.priority_level === 3 && <FocusLabel />}
                       {tender.estimated_value && (
                         <span className="font-medium text-gray-700">{formatCurrency(tender.estimated_value, tender.currency || tender.estimated_cost_currency || 'INR')}</span>
                       )}

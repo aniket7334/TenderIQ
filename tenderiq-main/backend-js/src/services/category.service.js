@@ -142,9 +142,25 @@ function categoryRegexBody(category) {
 /** Sector names for the filter (in rule order). */
 const CATEGORY_NAMES = CATEGORY_RULES.map((r) => r.category);
 
+/**
+ * The company's focus sectors, in the order of its keyword list (Nov 2026).
+ * Shown at the top of the Sector filter, before all other sectors.
+ */
+const FOCUS_SECTORS = [
+  "Dredging", "Reclamation", "Breakwater", "Marine Structures", "Coastal", "Berth", "Jetty", "Quay", "Wharf",
+  "Port", "Terminal", "Offshore", "Piling & Foundations", "Desilting", "Intake & Outfall", "Pipeline",
+  "Tunnelling", "Trenching", "HDD", "Subsea Cable", "Marine Survey", "MLD",
+  // added to the top list later (Nov 2026)
+  "Shipping", "Dock", "Harbour", "Bridge", "Water/Plumbing", "Vessel",
+];
+/** Next in the Sector filter (and in priority): the middle of the list. */
+const MIDDLE_SECTORS = ["Procurement"];
+
 module.exports = {
   CATEGORY_RULES,
   CATEGORY_NAMES,
+  FOCUS_SECTORS,
+  MIDDLE_SECTORS,
   PRIORITY_CATEGORIES,
   detectCategories,
   getPrimaryCategory,
