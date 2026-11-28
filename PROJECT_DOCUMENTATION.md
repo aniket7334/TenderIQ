@@ -422,6 +422,8 @@ The **Pipeline** category was added for pipeline / pipe-laying tenders (previous
 - **Topics:** each item of the company keyword list is understood as a whole — "Shore/coastal protection" searches shore protection, sea walls, revetments, groynes …; "Container/cargo/fishing/cruise terminals" any of those terminals; "Ports & port expansion", "Piling / marine foundations / dolphins", "HDD / horizontal directional drilling", "Marine geotechnical/hydrographic investigations" … Every sector name works the same way.
 - **Words:** otherwise every word must appear, in any order, each with its **synonyms / abbreviations / plurals** (HDD ⇄ horizontal directional drilling, TBM ⇄ tunnel boring machine, MLD ⇄ million litres per day, jetty ⇄ jetties, wharf ⇄ wharves, harbour ⇄ harbor, tunnel ⇄ tunnelling …). Known terms match as whole words ("port" ≠ "portable"); other words match the start of a word ("ultrason" → "ultrasonic").
 - **Other meanings left out:** "HDD" skips computer bids (TB / GB, SATA, SSD, servers, CCTV …) and "tunnel" skips tunnel coolers / ovens / dryers / wind tunnels — unless the wanted meaning is also clearly there.
+- **Docks:** "dock" (also "dry dock", "dockyard", "drydocking") finds docks, dry docks, drydocking repairs, dockyards (e.g. "Naval Dockyard") and floating docks — whole-word "dock" alone missed those. Laptop / USB "docking stations" are left out unless the tender is clearly marine (ship, vessel, naval, harbour, port, AUV / ROV …).
+- **Checked for every keyword (28 Nov 2026):** the old search (live site until the next deploy) looked for the exact text in title / work name / bid number only, so on GeM data it found **nothing** for dredging (GeM writes "Dredger", "Dredge", buyer "Dredging Corporation of India"), waterway, harbor, shipyard, port expansion, coastal / shore protection, marine structures, cable trenching, cargo / container / cruise terminal, intake pipeline, ship repair and tunnelling; the smart search finds them. Keywords with no tenders in any source at the time (quay, desilting, TBM, subsea cable / pipeline / tunnel, smart city …) correctly find none. Fewer results than the old search only where that is wanted: "hdd" (computer hard disks), "port" (report / support / transport), "bridge" (weighbridges, electronic bridges), "dock" (docking stations).
 - Searches **title, work name, scope of work, buyer, issuing office, location and state**; **bid numbers** still match as typed.
 - **Open tenders first:** search results list tenders whose deadline is still ahead first, then closed ones (deadline passed, or none given); within each group the usual order (marine priority, then the chosen sort). The API returns `open_total`; the page says "N open listed first, then M closed", draws a **"Closed tenders — deadline passed"** divider where they start, shows "Closed <date>" instead of "Due", and the table's Status says CLOSED (not OPEN) for closed tenders nobody has worked on. The list without a search is unchanged.
 - The Tenders page shows how the search was understood ("Searching for … — any of: …"); the API returns it as `search_understood`.
@@ -721,6 +723,7 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 58. **Refresh button on the Tenders page** (fetch from all sources, with progress) **and new source: Karnataka Ports and Inland Water Transport (KPPP)**; Gujarat Maritime Board's missing intermediate certificate supplied so its reads don't fail.
 59. **Dashboard Refresh = Tenders Refresh** (one shared hook: admins fetch from all sources with progress; "GeM Now" and "Scrape Now" kept beside it); Andhra Pradesh Maritime Board checked and left out (its tender API exposes downloaders' personal data).
 60. **Admins are told when a source stops working** (refused, not responding, access denied, certificate problem, or suddenly empty — after 2 failed runs in a row, once) **and when it works again**; "Not working" badge with the reason on Admin → Sources. The eTenders / CPPP / state-portal reader now records its errors.
+61. **Search: "dredging" (and 14 more keywords) on the live site** — the cause was the old exact-text search still deployed; the smart search (in the next deploy) finds them. Search for "dock" now also finds dockyards and drydocking, without laptop docking stations.
 
 
 
@@ -736,6 +739,30 @@ Quick checks: `GET /health` (API + sync), `https://tenderiq-theta.vercel.app/api
 
 
 
+
+### Commits and deploy status (28 Nov 2026)
+
+**Live on Vercel / Render:** up to `b087881` "Notify admins in-app about every new account" (step 41).
+
+**Committed locally, not yet pushed / deployed** (oldest first). The live site gets all of them with the next `git push origin main`; on the first start the backend adds the new sources and runs the one-time clean-ups by itself.
+
+| Commit | What it holds | Steps |
+|---|---|---|
+| `e4d2df9` | Responsive admin tables: fit beside the sidebar on every screen | 42 |
+| `87b36fa` | Company keyword list: new sectors, **smart search**, keyword matching fixes (fixes "dredging" and 14 more keywords that find nothing on the live site) | 43 |
+| `04a8788` | Search: open tenders first, then closed ones | 44 |
+| `8bc8592` | Priority levels: company keywords first, procurement in the middle | 45, 46 |
+| `545e4c4` | Back to the same search results after opening a tender | 47 |
+| `f4b08be` | New source: Mumbai Port Authority (mumbaiport.gov.in) | 48 |
+| `b0e12ba` | Port sources on CPPP / eTenders, one tender from several sources, where to view and apply, city with country | 49–53 |
+| `5c499c7` | New sources: Deendayal Port (Kandla) and Cochin Port Authority; source access status list | 54, 55 |
+| `af1017d` | Refresh button on the Tenders page; state portal, Gujarat and Karnataka port sources | 56–58 |
+| `7d305ad` | Dashboard Refresh works like the Tenders page (GeM Now / Scrape Now kept); Andhra Pradesh checked and left out | 59 |
+| `9fae876` | Admins told when a tender source stops working and when it recovers | 60 |
+
+**Not committed yet:** search for "dock" also finds dockyards and drydocking (`search.service.js`) and the search check of every keyword (step 61).
+
+**After the deploy, check:** each new source's first run from Render (Singapore) — Admin → Sources badges and "Source not working" alerts; sources refused from Render need the Vercel Mumbai relay (as GeM). Search "dredging" on the live site should list the GeM dredging tenders.
 
 ---
 

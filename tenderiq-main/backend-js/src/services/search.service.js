@@ -40,6 +40,8 @@ const TOPICS = [
     { name: 'jetties', aliases: ['jetty'], terms: ['jetty', 'jetties'] },
     { name: 'quays', aliases: ['quay', 'quay wall'], terms: ['quay', 'quays', 'quay wall'] },
     { name: 'wharves', aliases: ['wharf'], terms: ['wharf', 'wharves'] },
+    // "dock" alone missed "Naval Dockyard" and "Drydocking repairs" (whole-word match)
+    { name: 'docks', aliases: ['dock', 'dry dock', 'drydock', 'dry docks', 'dockyard', 'dockyards', 'dry docking', 'drydocking', 'floating dock'], terms: ['dock', 'dry dock', 'drydock', 'drydocking', 'dry docking', 'dockyard', 'floating dock', 'dock repair', 'docking'], not: 'dock' },
     { name: 'ports port expansion', aliases: ['port expansion', 'ports', 'port development', 'ports and port expansion'], terms: ['port', 'ports', 'seaport', 'sea port', 'port expansion', 'port development', 'port trust', 'port authority', 'harbour', 'harbor'] },
     { name: 'container cargo fishing cruise terminals', aliases: ['terminals', 'terminal', 'container terminal', 'cargo terminal', 'fishing terminal', 'cruise terminal', 'container terminals', 'cruise terminals'], terms: ['container terminal', 'cargo terminal', 'cruise terminal', 'passenger terminal', 'fishing harbour', 'fishing harbor', 'fishing port', 'fishing jetty', 'ro ro terminal', 'multipurpose terminal', 'multi purpose terminal', 'liquid terminal', 'bulk terminal', 'lng terminal', 'oil terminal', 'marine terminal'] },
     { name: 'offshore marine civil works', aliases: ['offshore', 'offshore works', 'offshore marine works', 'marine civil works'], terms: ['offshore', 'nearshore', 'offshore works', 'marine civil'] },
@@ -96,6 +98,11 @@ const NOT_CONTEXT = {
     hdd: {
         unless: '(^|[^a-z0-9])(horizontal[^a-z0-9]+directional|directional[^a-z0-9]+drilling|trenchless|hdd[^a-z0-9]+(crossings?|method|works?|drilling))',
         not: '(^|[^a-z0-9])([0-9]+[^a-z0-9]*(tb|gb)|sata|ssd|hard[^a-z0-9]*dis[ck]|nvr|dvr|cctv|laptops?|desktops?|servers?|computers?|workstations?|storage|raid|cameras?|poe|switch(es)?|monitors?|printers?|ram|processors?|ups)([^a-z0-9]|$)',
+    },
+    // laptop / USB "docking stations" are computer accessories, not docks
+    dock: {
+        unless: '(^|[^a-z0-9])(dry[^a-z0-9]*dock|dockyards?|floating[^a-z0-9]+docks?|ships?|vessels?|boats?|launch(es)?|tugs?|barges?|dredgers?|naval|marine|harbou?rs?|ports?|auvs?|rovs?|underwater|subsea)([^a-z0-9]|$)',
+        not: '(^|[^a-z0-9])(docking[^a-z0-9]+stations?|(usb|laptop|notebook|type[^a-z0-9]*c)[^a-z0-9]+docks?|docks?[^a-z0-9]+(station|hub)s?)([^a-z0-9]|$)',
     },
     tunnel: {
         unless: '(^|[^a-z0-9])(tunnel(l)?ing|tbm|tunnel[^a-z0-9]+(boring|construction|lining|excavation|works?))',
